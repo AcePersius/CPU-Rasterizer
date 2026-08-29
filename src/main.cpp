@@ -12,6 +12,19 @@
 // end
 
 
+triangle SRTriangle1 = {
+{{200, 150}, {0 , 0, 255, 255}},
+{{200, 300}, {0 , 0, 255, 255}},
+{{600, 300}, {0 , 0, 255, 255}},
+};
+
+
+triangle SRTriangle2 = {
+{{600, 300}, {255, 0, 0, 255}},
+{{600, 150}, {255, 0, 0, 255}},
+{{200, 150}, {255, 0, 0, 255}},
+};
+
 // Rasterizer Modes relating to determinant values
 // IE if a mesh's vertexes are in a Counter Clockwise Order us CCW
 // Clock Wise use CW, if order is unknown use both
@@ -29,88 +42,6 @@ struct framebuffer{
     const windingModes WindingMode = CCW;
 };
 
-// converts x, y screen coords to pixel indice
-// used in PixelData
-std::uint32_t xyToIndex(std::uint32_t x, std::uint32_t y)
-{
-    std::uint32_t index = x + (y * framebuffer::width);
-    return index;
-}
-
-struct color{
-    std::uint8_t red;
-    std::uint8_t green;
-    std::uint8_t blue;
-    std::uint8_t alpha;
-};
-
-// Helper function for pixelColorAttributer function
-std::uint32_t pixelPackager(color pixel)
-{
-    std::uint32_t packed_pixel {0};
-    packed_pixel |= static_cast<std::uint32_t>(pixel.red) << 24;
-    packed_pixel |= static_cast<std::uint32_t>(pixel.green) << 16;
-    packed_pixel |= static_cast<std::uint32_t>(pixel.blue) << 8;
-    packed_pixel |= static_cast<std::uint32_t>(pixel.alpha) << 0;
-    return packed_pixel;
-}
-// Receives Pixel RGBA data and turns it into a 32bit "packed" pixel 
-// Takes input from:
-// Uses Function(s): pixelpackager
-// Sends output to: Pixel Data
-std::uint32_t pixelColorAttributer(std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint8_t alpha)
-{
-
-    color pixel;
-    pixel.red = red;
-    pixel.green = green;
-    pixel.blue = blue;
-    pixel.alpha = alpha;
-    std::uint32_t packed_pixel = pixelPackager(pixel);
-    return packed_pixel;
-}
-
-
-// Takes temp pixel data, and assemblies it into the data buffer for display
-// refirt to simply made a background
-void FramePackagerBackground(PixelData &pixel, framebuffer &buffer)
-{
-    for (std::uint32_t i = 0; i < (framebuffer::width * framebuffer::height); i++)
-    {
-        std::uint32_t packed_pixel;
-        packed_pixel = pixel.pixelColor;
-        buffer.pixels[i] = packed_pixel;
-    }
-}
-
-
-void FramePackager(PixelData &pixel, framebuffer &buffer)
-{
-    std::uint32_t packed_pixel;
-    packed_pixel = pixel.pixelColor;
-    buffer.pixels[pixel.indice] = packed_pixel;
-}
-
-// Turns Mesh Data into Plotted 2d points
-// Im going to keep this as a dot plotter
-void MeshToFrameXY(auto &meshdata, framebuffer &frameBufferData)
-{
-    // Rasterizer definitely should feed here as its own meshdata
-    for (int i = 0; i < std::size(meshdata); i += 2)
-    {
-        PixelData pixel;
-        pixel.x = meshdata[i];
-        pixel.y = meshdata[i+1];
-        // checking for out of bounds indice
-        if (pixel.x >= framebuffer::width || pixel.y >= framebuffer::height)
-        {
-            continue;
-        }
-        pixel.indice = xyToIndex(pixel.x, pixel.y);
-        FramePackager(pixel, frameBufferData);
-    }
-
-}
 
 struct BoundingBoxData{
     int xmin;
@@ -120,12 +51,14 @@ struct BoundingBoxData{
 };
 
 // New Rasterizer + Functions
-BoundingBoxData boundingBox(Vector2d &vertexA, Vector2d &vertexB, Vector2d &vertexC);
-bool determinantOffset(Vector2d &start, Vector2d &end);
-int getDeterminant(Vector2d &vertexA, Vector2d &vertexB, Vector2d &pointC);
-void drawToBuffer(PixelData &pixel, framebuffer &frameBufferData);
-void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, PixelData pixel);
-
+BoundingBoxData boundingBox(triangle &meshdata);
+bool TopLeftFillFunc(Vector2d &start, Vector2d &end);
+int getDeterminant(Vector2d &VertexA, Vector2d &VertexB, Vector2d &pointC);
+void drawToBuffer(Vertex2d &pixel, framebuffer &frameBufferData, triangle &meshdata);
+void RASTERIZE(triangle &meshdata, framebuffer &frameBufferData);
+void FramePackager(Vertex2d &pixel, framebuffer &buffer, triangle &meshdata);
+std::uint32_t pixelPackager(RGBA &pixel);
+void fillpixelcolor(RGBA &pixel, triangle &meshdata);
 
 
 int main(int argc, char* argv[]) {
@@ -156,42 +89,13 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // temp pixel data
-    PixelData  WHITE;
-    PixelData  GREEN;
-    GREEN.red = 0;
-    GREEN.green = 255;
-    GREEN.blue = 0;
-    GREEN.pixelColor =
-    pixelColorAttributer(
-        GREEN.red,
-        GREEN.green,
-        GREEN.blue,
-        GREEN.alpha
-    );
-    PixelData  BLUE;
-    BLUE.red = 0;
-    BLUE.green = 0;
-    BLUE.blue = 255;
-    BLUE.pixelColor =
-    pixelColorAttributer(
-        BLUE.red,
-        BLUE.green,
-        BLUE.blue,
-        BLUE.alpha
-    );
 
     // Retrieves finalized buffer of data from other functions
-    // This is the background for now
-    framebuffer frameBufferData;
-    FramePackagerBackground(WHITE, frameBufferData);
+    framebuffer frameBufferData {0};
 
-
-    // Plots vertex points of the triangles
-    MeshToFrameXY(triangle, frameBufferData);
-    // use New Rasterizer instead
-    RASTERIZE(rightTriangle1, frameBufferData, GREEN);
-    RASTERIZE(rightTriangle2, frameBufferData, BLUE);
+    // Step1: Feed FrameBuffer and Mesh into Rasterizer
+    RASTERIZE(SRTriangle1, frameBufferData);
+    RASTERIZE(SRTriangle2, frameBufferData);
 
 
     // Currently acts as a preset buffer to write pixels to before displaying
@@ -210,6 +114,7 @@ int main(int argc, char* argv[]) {
                 done = true;
             }
         }
+        // step 9
         SDL_BlitSurface(surface, NULL, SDL_GetWindowSurface(window), NULL);
         SDL_UpdateWindowSurface(window);
         // Do game logic, present a frame, etc.
@@ -225,42 +130,36 @@ int main(int argc, char* argv[]) {
 
 
 // Rasterizer
-void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, PixelData pixel)
+// Step 2, follow rasterizing steps
+void RASTERIZE(triangle &meshdata, framebuffer &frameBufferData)
 {
-    // breaking down Meshdata into points
-    // This step may be better to make a 2Dvector struct before
-    // and use that as the intake arguement instead
-    Vector2d a;
-        a.x = meshdata[0];
-        a.y = meshdata[1];      
-    Vector2d b;
-        b.x = meshdata[2];
-        b.y = meshdata[3];
-    Vector2d c;
-        c.x = meshdata[4];
-        c.y = meshdata[5];
-    Vector2d p;
     // For this data xyMinMax comes in the format of:
     // [0] = xmin [1] = ymin [2] = xmax [3] = ymax
-    BoundingBoxData xyMinMax = boundingBox(a, b, c);
+    // Step 3
+    BoundingBoxData xyMinMax = boundingBox(meshdata);
     // Top Left Fill Rule https://kristoffer-dyrkorn.github.io/triangle-rasterizer/4
     // determinantOffset can also be thought of as a true/false for IsTopleft true/false
     // Might change this later to that name instead
-    bool detABoffset = determinantOffset(a, b);
-    bool detBCoffset = determinantOffset(b, c);
-    bool detCAoffset = determinantOffset(c, a);
+    // Step 4
+    bool detABoffset = TopLeftFillFunc(meshdata.VertexA.position, meshdata.VertexB.position);
+    bool detBCoffset = TopLeftFillFunc(meshdata.VertexB.position, meshdata.VertexC.position);
+    bool detCAoffset = TopLeftFillFunc(meshdata.VertexC.position, meshdata.VertexA.position);
+    // This p vector serves as the vector data to be filled in during the loop
+    Vertex2d pixel;
     for (int y = xyMinMax.ymin; y <= xyMinMax.ymax; y++)
     {
         for (int x = xyMinMax.xmin; x <= xyMinMax.xmax; x++)
         
         {
-            p.x = x;
-            p.y = y;
+            // update pixel values to current x,y coord
+            pixel.position.x = x;
+            pixel.position.y = y;
+            // Step 5
             int determinants[3];
-                determinants[0] = getDeterminant(a, b, p);
-                determinants[1] = getDeterminant(b, c, p);
-                determinants[2] = getDeterminant(c, a, p);
-            switch (frameBufferData.WindingMode)
+                determinants[0] = getDeterminant(meshdata.VertexA.position, meshdata.VertexB.position, pixel.position);
+                determinants[1] = getDeterminant(meshdata.VertexB.position, meshdata.VertexC.position, pixel.position);
+                determinants[2] = getDeterminant(meshdata.VertexC.position, meshdata.VertexA.position, pixel.position);
+            switch (frameBufferData.WindingMode) // Step 6
             {
             case CW:
                 /* Note explaining the detoffset, the current offset checker for is a CCW, luckily we can still 
@@ -272,9 +171,7 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, PixelData pixel)
                 if ((determinants[0] <= (detABoffset ? -1 : 0)) && (determinants[1]  <= (detBCoffset ? -1 : 0)) 
                 && (determinants[2] <= (detCAoffset ? -1 : 0)))
                 {
-                    pixel.x = p.x;
-                    pixel.y = p.y;
-                    drawToBuffer(pixel, frameBufferData);
+                    drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
             
@@ -283,9 +180,7 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, PixelData pixel)
                 && (determinants[2] >= (detCAoffset ? 0 : 1))) || ((determinants[0] <= (detABoffset ? -1 : 0)) 
                 && (determinants[1]  <= (detBCoffset ? -1 : 0)) && (determinants[2] <= (detCAoffset ? -1 : 0))))
                 {
-                    pixel.x = p.x;
-                    pixel.y = p.y;
-                    drawToBuffer(pixel, frameBufferData);
+                    drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
 
@@ -293,9 +188,7 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, PixelData pixel)
                 if ((determinants[0] >= (detABoffset ? 0 : 1)) && (determinants[1]  >= (detBCoffset ? 0 : 1)) 
                 && (determinants[2] >= (detCAoffset ? 0 : 1)))
                 {
-                    pixel.x = p.x;
-                    pixel.y = p.y;
-                    drawToBuffer(pixel, frameBufferData);
+                    drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
             }
@@ -305,19 +198,21 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, PixelData pixel)
 
 }
 // Finding candidate pixels aka Creating Bounding Box
-BoundingBoxData boundingBox(Vector2d &vertexA, Vector2d &vertexB, Vector2d &vertexC)
+// Step 3
+BoundingBoxData boundingBox(triangle &meshdata)
 {
     // https://kristoffer-dyrkorn.github.io/triangle-rasterizer/1
     BoundingBoxData xyMinMax;
-    xyMinMax.xmin = std::min(vertexA.x, std::min(vertexB.x, vertexC.x));
-    xyMinMax.ymin = std::min(vertexA.y, std::min(vertexB.y, vertexC.y));
-    xyMinMax.xmax = std::max(vertexA.x, std::max(vertexB.x, vertexC.x));
-    xyMinMax.ymax = std::max(vertexA.y, std::max(vertexB.y, vertexC.y));
+    xyMinMax.xmin = std::min(meshdata.VertexA.position.x, std::min(meshdata.VertexB.position.x, meshdata.VertexC.position.x));
+    xyMinMax.ymin = std::min(meshdata.VertexA.position.y, std::min(meshdata.VertexB.position.y, meshdata.VertexC.position.y));
+    xyMinMax.xmax = std::max(meshdata.VertexA.position.x, std::max(meshdata.VertexB.position.x, meshdata.VertexC.position.x));
+    xyMinMax.ymax = std::max(meshdata.VertexA.position.y, std::max(meshdata.VertexB.position.y, meshdata.VertexC.position.y));
     return xyMinMax;
 
 }
 // Finding determinant-Offeset for the topleft fill rule
-bool determinantOffset(Vector2d &start, Vector2d &end)
+// Step 4
+bool TopLeftFillFunc(Vector2d &start, Vector2d &end)
 {
     int edge[2];
     edge[0] = end.x - start.x;
@@ -327,7 +222,8 @@ bool determinantOffset(Vector2d &start, Vector2d &end)
     return isLeftEdge || isTopEdge;
 }
 
-int getDeterminant(Vector2d &vertexA, Vector2d &vertexB, Vector2d &pointC)
+// Step 5
+int getDeterminant(Vector2d &VertexA, Vector2d &VertexB, Vector2d &pointC)
 {
     // https://kristoffer-dyrkorn.github.io/triangle-rasterizer/1
     // ab and ac both could be converted into Vector2d types but Im choosing not to
@@ -335,25 +231,57 @@ int getDeterminant(Vector2d &vertexA, Vector2d &vertexB, Vector2d &pointC)
     // types, which because I dont need to pass arrays of data, its perfectly fine to do it this way
     int ab[2];
     int ac[2];
-        ab[0] = vertexB.x - vertexA.x;
-        ab[1] = vertexB.y - vertexA.y;
-        ac[0] = pointC.x  - vertexA.x;
-        ac[1] = pointC.y  - vertexA.y;
+        ab[0] = VertexB.x - VertexA.x;
+        ab[1] = VertexB.y - VertexA.y;
+        ac[0] = pointC.x  - VertexA.x;
+        ac[1] = pointC.y  - VertexA.y;
     int determinant = ab[1] * ac[0] - ab[0] * ac[1];
     return determinant;
 }
 
-// Changes from MeshToFrameXY
 // Takes valid pixels (ie fits in frame) and attaches the pixel's data to its correct
 // place in the buffer using the FramePackager
 // barebones rn but functions will be added
-void drawToBuffer(PixelData &pixel, framebuffer &frameBufferData)
+// Step 6
+void drawToBuffer(Vertex2d &pixel, framebuffer &frameBufferData, triangle &meshdata)
 {
         // checking for out of bounds indice
-        if (pixel.x >= framebuffer::width || pixel.y >= framebuffer::height)
+        if (pixel.position.x >= framebuffer::width || pixel.position.y >= framebuffer::height)
         {
             return;
         }
-        pixel.indice = xyToIndex(pixel.x, pixel.y);
-        FramePackager(pixel, frameBufferData);
+        FramePackager(pixel, frameBufferData, meshdata);
+}
+
+// step 7
+void FramePackager(Vertex2d &pixel, framebuffer &buffer, triangle &meshdata)
+{
+    std::uint32_t packed_pixel;
+    // temp gives pixels the avg color of all three vertices colors
+    fillpixelcolor(pixel.colorData, meshdata);
+    // Pixel packer needs to come back
+    packed_pixel = pixelPackager(pixel.colorData);
+    // converts x, y screen coords to pixel indice and used to be a helper function
+    std::uint32_t indice = pixel.position.x + (pixel.position.y * framebuffer::width);
+    buffer.pixels[indice] = packed_pixel;
+}
+
+// step 8
+std::uint32_t pixelPackager(RGBA &pixel)
+{
+    std::uint32_t packed_pixel {0};
+    packed_pixel |= static_cast<std::uint32_t>(pixel.red) << 24;
+    packed_pixel |= static_cast<std::uint32_t>(pixel.green) << 16;
+    packed_pixel |= static_cast<std::uint32_t>(pixel.blue) << 8;
+    packed_pixel |= static_cast<std::uint32_t>(pixel.alpha) << 0;
+    return packed_pixel;
+}
+
+// TEMP
+void fillpixelcolor( RGBA &pixel, triangle &meshdata)
+{
+    pixel.red   = ((meshdata.VertexA.colorData.red   + meshdata.VertexB.colorData.red   + meshdata.VertexC.colorData.red  ) / 3);
+    pixel.green = ((meshdata.VertexA.colorData.green + meshdata.VertexB.colorData.green + meshdata.VertexC.colorData.green) / 3);
+    pixel.blue  = ((meshdata.VertexA.colorData.blue  + meshdata.VertexB.colorData.blue  + meshdata.VertexC.colorData.blue ) / 3);
+    pixel.alpha = ((meshdata.VertexA.colorData.alpha + meshdata.VertexB.colorData.alpha + meshdata.VertexC.colorData.alpha) / 3);
 }
