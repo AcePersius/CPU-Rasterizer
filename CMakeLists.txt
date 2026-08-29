@@ -12,3 +12,7 @@ add_executable(TinyRasterizer
 )
 
 target_link_libraries(TinyRasterizer PRIVATE SDL3::SDL3)
+
+target_include_directories(TinyRasterizer PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
