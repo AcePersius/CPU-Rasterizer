@@ -6,23 +6,29 @@
 #include <iterator>
 // used for std::min, std::max
 #include <algorithm>
+// used for std::abs(), std::sin() std::cos()
+#include <cmath>
+// used for std::vector<>
+#include <vector>
 
 // my supporting files
 #include <testmeshes.hpp>
 // end
 
+constexpr float pie = 3.141592;
 
-triangle SRTriangle1 = {
-{{200, 150}, {0 , 0, 255, 255}},
-{{200, 300}, {0 , 0, 255, 255}},
-{{600, 300}, {0 , 0, 255, 255}},
+Transformation transform{
+{400, 200},
+90,
+{.5, .5}
 };
 
-
-triangle SRTriangle2 = {
-{{600, 300}, {255, 0, 0, 255}},
-{{600, 150}, {255, 0, 0, 255}},
-{{200, 150}, {255, 0, 0, 255}},
+Mesh2d SquareMesh = {
+{{{100, 100}, {255,255,0,255}},
+{{100, 200}, {255,255,255,255}},
+{{300, 200}, {255,0,0,255}},
+{{300, 100}, {0,255,0,255}}},
+{0, 1, 2, 2, 3, 0}
 };
 
 // Rasterizer Modes relating to determinant values
@@ -37,28 +43,24 @@ Both = 2
 
 struct framebuffer{
     const static int width = 800;
-    const static int height = 450;
+    const static int height = 600;
     std::uint32_t pixels[width * height];
     const windingModes WindingMode = CCW;
 };
 
-
-struct BoundingBoxData{
-    int xmin;
-    int ymin;
-    int xmax;
-    int ymax;
-};
-
+// Takes in mesh data and sends it to rasterizer
+void RenderMesh(Mesh2d &mesh, framebuffer &frameBufferData, Transformation &transform);
+void TransformationStage(triangle &triangleBuffer, Transformation &transform);
 // New Rasterizer + Functions
-BoundingBoxData boundingBox(triangle &meshdata);
+BoundingBoxData boundingBox(auto &meshdata);
 bool TopLeftFillFunc(Vector2d &start, Vector2d &end);
-int getDeterminant(Vector2d &VertexA, Vector2d &VertexB, Vector2d &pointC);
-void drawToBuffer(Vertex2d &pixel, framebuffer &frameBufferData, triangle &meshdata);
-void RASTERIZE(triangle &meshdata, framebuffer &frameBufferData);
-void FramePackager(Vertex2d &pixel, framebuffer &buffer, triangle &meshdata);
+float getDeterminant(Vector2d &VertexA, Vector2d &VertexB, Vector2d &pointC);
+void barycentricColor(Determinant &determinants, auto &meshdata, Vertex2d &pixel);
+void drawToBuffer(Vertex2d &pixel, framebuffer &frameBufferData, auto &meshdata);
+void RASTERIZE(auto &meshdata, framebuffer &frameBufferData);
+void FramePackager(Vertex2d &pixel, framebuffer &buffer, auto &meshdata);
 std::uint32_t pixelPackager(RGBA &pixel);
-void fillpixelcolor(RGBA &pixel, triangle &meshdata);
+void fillpixelcolor(RGBA &pixel, auto &meshdata);
 
 
 int main(int argc, char* argv[]) {
@@ -74,7 +76,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     int width =  800;
-    int height = 450;
+    int height = 600;
     // Create an application window with the following settings:
     window = SDL_CreateWindow(
         "An SDL3 window",                  // window title
@@ -93,10 +95,11 @@ int main(int argc, char* argv[]) {
     // Retrieves finalized buffer of data from other functions
     framebuffer frameBufferData {0};
 
-    // Step1: Feed FrameBuffer and Mesh into Rasterizer
-    RASTERIZE(SRTriangle1, frameBufferData);
-    RASTERIZE(SRTriangle2, frameBufferData);
+    // Applies Transformations
+    void TransformationStage();
 
+    // RendersMesh
+    RenderMesh(SquareMesh, frameBufferData, transform);
 
     // Currently acts as a preset buffer to write pixels to before displaying
     SDL_Surface * surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, frameBufferData.pixels, frameBufferData.width *4);
@@ -114,7 +117,7 @@ int main(int argc, char* argv[]) {
                 done = true;
             }
         }
-        // step 9
+        // step 11
         SDL_BlitSurface(surface, NULL, SDL_GetWindowSurface(window), NULL);
         SDL_UpdateWindowSurface(window);
         // Do game logic, present a frame, etc.
@@ -129,9 +132,63 @@ int main(int argc, char* argv[]) {
 }
 
 
+void RenderMesh(Mesh2d &mesh, framebuffer &frameBufferData, Transformation &transform)
+{
+    // Buffer for drawing triangles
+    if (mesh.Indices.size() % 3 != 0)
+    {
+        return;
+    }
+        for(std::size_t i = 0; i < (mesh.Indices.size()); i+=3)
+    {
+        triangle triangleBuffer {0};
+        triangleBuffer.VertexA = mesh.Vertices[mesh.Indices[i]];
+        triangleBuffer.VertexB = mesh.Vertices[mesh.Indices[i+1]];
+        triangleBuffer.VertexC = mesh.Vertices[mesh.Indices[i+2]];
+        TransformationStage(triangleBuffer, transform);
+        RASTERIZE(triangleBuffer, frameBufferData);
+    }
+}
+// Apply Transformation Properties
+// double check rotation for rotating around the middle pixel rather than rotating around where the triange actually should be
+
+void TransformationStage(triangle &triangleBuffer, Transformation &transform)
+{
+    // For Scale
+    triangleBuffer.VertexA.position = triangleBuffer.VertexA.position * transform.scale;
+    triangleBuffer.VertexB.position = triangleBuffer.VertexB.position * transform.scale;
+    triangleBuffer.VertexC.position = triangleBuffer.VertexC.position * transform.scale;
+    // For Rotation
+    float x;
+    float y;
+    x = triangleBuffer.VertexA.position.x;
+    y = triangleBuffer.VertexA.position.y;
+    triangleBuffer.VertexA.position.x =  x * std::cos((transform.rotation * pie) / 180) -
+        y * std::sin((transform.rotation * pie) / 180);
+    triangleBuffer.VertexA.position.y =  x * std::sin((transform.rotation * pie) / 180) +
+        y * std::cos((transform.rotation * pie) / 180);
+    x = triangleBuffer.VertexB.position.x;
+    y = triangleBuffer.VertexB.position.y;
+    triangleBuffer.VertexB.position.x =  x * std::cos((transform.rotation * pie) / 180) -
+        y * std::sin((transform.rotation * pie) / 180);
+    triangleBuffer.VertexB.position.y =  x * std::sin((transform.rotation * pie) / 180) +
+        y * std::cos((transform.rotation * pie) / 180);
+    x = triangleBuffer.VertexC.position.x;
+    y = triangleBuffer.VertexC.position.y;
+    triangleBuffer.VertexC.position.x =  x * std::cos((transform.rotation * pie) / 180) -
+        y * std::sin((transform.rotation * pie) / 180);
+    triangleBuffer.VertexC.position.y =  x * std::sin((transform.rotation * pie) / 180) +
+        y * std::cos((transform.rotation * pie) / 180);
+    // For Position
+    triangleBuffer.VertexA.position =  triangleBuffer.VertexA.position + transform.position;
+    triangleBuffer.VertexB.position =  triangleBuffer.VertexB.position + transform.position;
+    triangleBuffer.VertexC.position =  triangleBuffer.VertexC.position + transform.position;
+}
+
+
 // Rasterizer
 // Step 2, follow rasterizing steps
-void RASTERIZE(triangle &meshdata, framebuffer &frameBufferData)
+void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
 {
     // For this data xyMinMax comes in the format of:
     // [0] = xmin [1] = ymin [2] = xmax [3] = ymax
@@ -155,10 +212,10 @@ void RASTERIZE(triangle &meshdata, framebuffer &frameBufferData)
             pixel.position.x = x;
             pixel.position.y = y;
             // Step 5
-            int determinants[3];
-                determinants[0] = getDeterminant(meshdata.VertexA.position, meshdata.VertexB.position, pixel.position);
-                determinants[1] = getDeterminant(meshdata.VertexB.position, meshdata.VertexC.position, pixel.position);
-                determinants[2] = getDeterminant(meshdata.VertexC.position, meshdata.VertexA.position, pixel.position);
+            Determinant determinants;
+                determinants.AB = getDeterminant(meshdata.VertexA.position, meshdata.VertexB.position, pixel.position);
+                determinants.BC = getDeterminant(meshdata.VertexB.position, meshdata.VertexC.position, pixel.position);
+                determinants.CA = getDeterminant(meshdata.VertexC.position, meshdata.VertexA.position, pixel.position);
             switch (frameBufferData.WindingMode) // Step 6
             {
             case CW:
@@ -168,26 +225,31 @@ void RASTERIZE(triangle &meshdata, framebuffer &frameBufferData)
                    logic applies to the offset. Due to the offset function be made for CCW, the CW options of 
                    0 and -1 need to be flipped to -1 and 0 because CCW true is CW false
                 */
-                if ((determinants[0] <= (detABoffset ? -1 : 0)) && (determinants[1]  <= (detBCoffset ? -1 : 0)) 
-                && (determinants[2] <= (detCAoffset ? -1 : 0)))
+                if ((determinants.AB <= (detABoffset ? -.00001 : 0)) && (determinants.BC  <= (detBCoffset ? -.00001 : 0)) 
+                && (determinants.CA <= (detCAoffset ? -.00001 : 0)))
                 {
+                    // Step 7
+                    barycentricColor(determinants, meshdata, pixel);
+                    // Step 8
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
             
             case Both:
-                if (((determinants[0] >= (detABoffset ? 0 : 1)) && (determinants[1]  >= (detBCoffset ? 0 : 1)) 
-                && (determinants[2] >= (detCAoffset ? 0 : 1))) || ((determinants[0] <= (detABoffset ? -1 : 0)) 
-                && (determinants[1]  <= (detBCoffset ? -1 : 0)) && (determinants[2] <= (detCAoffset ? -1 : 0))))
+                if (((determinants.AB >= (detABoffset ? 0 : .00001)) && (determinants.BC  >= (detBCoffset ? 0 : .00001)) 
+                && (determinants.CA >= (detCAoffset ? 0 : .00001))) || ((determinants.AB <= (detABoffset ? -.00001 : 0)) 
+                && (determinants.BC  <= (detBCoffset ? -.00001 : 0)) && (determinants.CA <= (detCAoffset ? -.00001 : 0))))
                 {
+                    barycentricColor(determinants, meshdata, pixel);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
 
             default: //default is CCW
-                if ((determinants[0] >= (detABoffset ? 0 : 1)) && (determinants[1]  >= (detBCoffset ? 0 : 1)) 
-                && (determinants[2] >= (detCAoffset ? 0 : 1)))
+                if ((determinants.AB >= (detABoffset ? 0 : .00001)) && (determinants.BC  >= (detBCoffset ? 0 : .00001)) 
+                && (determinants.CA >= (detCAoffset ? 0 : .00001)))
                 {
+                    barycentricColor(determinants, meshdata, pixel);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
@@ -199,7 +261,7 @@ void RASTERIZE(triangle &meshdata, framebuffer &frameBufferData)
 }
 // Finding candidate pixels aka Creating Bounding Box
 // Step 3
-BoundingBoxData boundingBox(triangle &meshdata)
+BoundingBoxData boundingBox(auto &meshdata)
 {
     // https://kristoffer-dyrkorn.github.io/triangle-rasterizer/1
     BoundingBoxData xyMinMax;
@@ -214,7 +276,7 @@ BoundingBoxData boundingBox(triangle &meshdata)
 // Step 4
 bool TopLeftFillFunc(Vector2d &start, Vector2d &end)
 {
-    int edge[2];
+    float edge[2];
     edge[0] = end.x - start.x;
     edge[1] = end.y - start.y;
     bool isLeftEdge = edge[1] > 0;
@@ -223,42 +285,40 @@ bool TopLeftFillFunc(Vector2d &start, Vector2d &end)
 }
 
 // Step 5
-int getDeterminant(Vector2d &VertexA, Vector2d &VertexB, Vector2d &pointC)
+float getDeterminant(Vector2d &VertexA, Vector2d &VertexB, Vector2d &pointC)
 {
     // https://kristoffer-dyrkorn.github.io/triangle-rasterizer/1
     // ab and ac both could be converted into Vector2d types but Im choosing not to
     // as it keeps things more straight forward imo without hiding data behind user created
     // types, which because I dont need to pass arrays of data, its perfectly fine to do it this way
-    int ab[2];
-    int ac[2];
+    float ab[2];
+    float ac[2];
         ab[0] = VertexB.x - VertexA.x;
         ab[1] = VertexB.y - VertexA.y;
         ac[0] = pointC.x  - VertexA.x;
         ac[1] = pointC.y  - VertexA.y;
-    int determinant = ab[1] * ac[0] - ab[0] * ac[1];
+    float determinant = ab[1] * ac[0] - ab[0] * ac[1];
     return determinant;
 }
 
 // Takes valid pixels (ie fits in frame) and attaches the pixel's data to its correct
 // place in the buffer using the FramePackager
 // barebones rn but functions will be added
-// Step 6
-void drawToBuffer(Vertex2d &pixel, framebuffer &frameBufferData, triangle &meshdata)
+// Step 8
+void drawToBuffer(Vertex2d &pixel, framebuffer &frameBufferData, auto &meshdata)
 {
         // checking for out of bounds indice
-        if (pixel.position.x >= framebuffer::width || pixel.position.y >= framebuffer::height)
+        if (pixel.position.x >= framebuffer::width || pixel.position.y >= framebuffer::height || pixel.position.x < 0 || pixel.position.y < 0)
         {
             return;
         }
         FramePackager(pixel, frameBufferData, meshdata);
 }
 
-// step 7
-void FramePackager(Vertex2d &pixel, framebuffer &buffer, triangle &meshdata)
+// step 10
+void FramePackager(Vertex2d &pixel, framebuffer &buffer, auto &meshdata)
 {
     std::uint32_t packed_pixel;
-    // temp gives pixels the avg color of all three vertices colors
-    fillpixelcolor(pixel.colorData, meshdata);
     // Pixel packer needs to come back
     packed_pixel = pixelPackager(pixel.colorData);
     // converts x, y screen coords to pixel indice and used to be a helper function
@@ -266,7 +326,7 @@ void FramePackager(Vertex2d &pixel, framebuffer &buffer, triangle &meshdata)
     buffer.pixels[indice] = packed_pixel;
 }
 
-// step 8
+// step 9
 std::uint32_t pixelPackager(RGBA &pixel)
 {
     std::uint32_t packed_pixel {0};
@@ -278,10 +338,28 @@ std::uint32_t pixelPackager(RGBA &pixel)
 }
 
 // TEMP
-void fillpixelcolor( RGBA &pixel, triangle &meshdata)
+void fillpixelcolor( RGBA &pixel, auto &meshdata)
 {
     pixel.red   = ((meshdata.VertexA.colorData.red   + meshdata.VertexB.colorData.red   + meshdata.VertexC.colorData.red  ) / 3);
     pixel.green = ((meshdata.VertexA.colorData.green + meshdata.VertexB.colorData.green + meshdata.VertexC.colorData.green) / 3);
     pixel.blue  = ((meshdata.VertexA.colorData.blue  + meshdata.VertexB.colorData.blue  + meshdata.VertexC.colorData.blue ) / 3);
     pixel.alpha = ((meshdata.VertexA.colorData.alpha + meshdata.VertexB.colorData.alpha + meshdata.VertexC.colorData.alpha) / 3);
+}
+// Step 7
+// barycentric coordinates
+void barycentricColor(Determinant &determinants, auto &meshdata, Vertex2d &pixel)
+{
+    float totalDeterminant = determinants.AB + determinants.BC + determinants.CA;
+    if (totalDeterminant == 0)
+    {
+        totalDeterminant = 1;
+    }
+    float percentageA = std::abs((determinants.BC) / totalDeterminant);
+    RGBA A = meshdata.VertexA.colorData * percentageA;
+    float percentageB = std::abs((determinants.CA) / totalDeterminant);
+    RGBA B = meshdata.VertexB.colorData * percentageB;
+    float percentageC = std::abs((determinants.AB) / totalDeterminant);
+    RGBA C = meshdata.VertexC.colorData * percentageC;
+
+    pixel.colorData = A + B + C;
 }
