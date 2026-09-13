@@ -49,8 +49,8 @@ struct framebuffer{
 };
 
 // Takes in mesh data and sends it to rasterizer
-void RenderMesh(Mesh2d &mesh, framebuffer &frameBufferData, Transformation &transform);
-void TransformationStage(triangle &triangleBuffer, Transformation &transform);
+void RenderMesh(Mesh2d const mesh, framebuffer &frameBufferData, Transformation const transform);
+void TransformVertPos(Vertex2d &Vertex, Transformation transform);
 // New Rasterizer + Functions
 BoundingBoxData boundingBox(auto &meshdata);
 bool TopLeftFillFunc(Vector2d &start, Vector2d &end);
@@ -95,9 +95,6 @@ int main(int argc, char* argv[]) {
     // Retrieves finalized buffer of data from other functions
     framebuffer frameBufferData {0};
 
-    // Applies Transformations
-    void TransformationStage();
-
     // RendersMesh
     RenderMesh(SquareMesh, frameBufferData, transform);
 
@@ -132,7 +129,7 @@ int main(int argc, char* argv[]) {
 }
 
 
-void RenderMesh(Mesh2d &mesh, framebuffer &frameBufferData, Transformation &transform)
+void RenderMesh(Mesh2d const mesh, framebuffer &frameBufferData, Transformation const transform)
 {
     // Buffer for drawing triangles
     if (mesh.Indices.size() % 3 != 0)
@@ -143,46 +140,32 @@ void RenderMesh(Mesh2d &mesh, framebuffer &frameBufferData, Transformation &tran
     {
         triangle triangleBuffer {0};
         triangleBuffer.VertexA = mesh.Vertices[mesh.Indices[i]];
+        TransformVertPos(triangleBuffer.VertexA, transform);
         triangleBuffer.VertexB = mesh.Vertices[mesh.Indices[i+1]];
+        TransformVertPos(triangleBuffer.VertexB, transform);
         triangleBuffer.VertexC = mesh.Vertices[mesh.Indices[i+2]];
-        TransformationStage(triangleBuffer, transform);
+        TransformVertPos(triangleBuffer.VertexC, transform);
         RASTERIZE(triangleBuffer, frameBufferData);
     }
 }
 // Apply Transformation Properties
 // double check rotation for rotating around the middle pixel rather than rotating around where the triange actually should be
-
-void TransformationStage(triangle &triangleBuffer, Transformation &transform)
+// Consider calculating the sin and cos before the function rather than having to redo the calculation every time
+void TransformVertPos(Vertex2d &Vertex, Transformation transform)
 {
     // For Scale
-    triangleBuffer.VertexA.position = triangleBuffer.VertexA.position * transform.scale;
-    triangleBuffer.VertexB.position = triangleBuffer.VertexB.position * transform.scale;
-    triangleBuffer.VertexC.position = triangleBuffer.VertexC.position * transform.scale;
+    Vertex.position = Vertex.position * transform.scale;
     // For Rotation
     float x;
     float y;
-    x = triangleBuffer.VertexA.position.x;
-    y = triangleBuffer.VertexA.position.y;
-    triangleBuffer.VertexA.position.x =  x * std::cos((transform.rotation * pie) / 180) -
+    x = Vertex.position.x;
+    y = Vertex.position.y;
+    Vertex.position.x =  x * std::cos((transform.rotation * pie) / 180) -
         y * std::sin((transform.rotation * pie) / 180);
-    triangleBuffer.VertexA.position.y =  x * std::sin((transform.rotation * pie) / 180) +
-        y * std::cos((transform.rotation * pie) / 180);
-    x = triangleBuffer.VertexB.position.x;
-    y = triangleBuffer.VertexB.position.y;
-    triangleBuffer.VertexB.position.x =  x * std::cos((transform.rotation * pie) / 180) -
-        y * std::sin((transform.rotation * pie) / 180);
-    triangleBuffer.VertexB.position.y =  x * std::sin((transform.rotation * pie) / 180) +
-        y * std::cos((transform.rotation * pie) / 180);
-    x = triangleBuffer.VertexC.position.x;
-    y = triangleBuffer.VertexC.position.y;
-    triangleBuffer.VertexC.position.x =  x * std::cos((transform.rotation * pie) / 180) -
-        y * std::sin((transform.rotation * pie) / 180);
-    triangleBuffer.VertexC.position.y =  x * std::sin((transform.rotation * pie) / 180) +
+    Vertex.position.y =  x * std::sin((transform.rotation * pie) / 180) +
         y * std::cos((transform.rotation * pie) / 180);
     // For Position
-    triangleBuffer.VertexA.position =  triangleBuffer.VertexA.position + transform.position;
-    triangleBuffer.VertexB.position =  triangleBuffer.VertexB.position + transform.position;
-    triangleBuffer.VertexC.position =  triangleBuffer.VertexC.position + transform.position;
+    Vertex.position =  Vertex.position + transform.position;
 }
 
 
