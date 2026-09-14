@@ -1,119 +1,99 @@
 #ifndef TESTMESHES_HPP
 #define TESTMESHES_HPP
 
-
-struct Vector2d{
-    float x;
-    float y;
+Transformation transform{
+{0, 0, 88},
+{40, -35, 15},
+{.25, .25, .25}
 };
 
-struct RGBA{
-    float red;
-    float green;
-    float blue;
-    float alpha;
+Camera cameraTransf{
+    {0, 0, 0},
+    {0, 0, 0}
 };
 
-struct Vertex2d{
-    Vector2d position;
-    RGBA colorData;
+Mesh2d CubeMesh = {
+
+{
+    // Front face - Red
+    {{-50, -50,  50}, {255,   0,   0, 255}},
+    {{ 50, -50,  50}, {255,   0,   0, 255}},
+    {{ 50,  50,  50}, {255,   0,   0, 255}},
+    {{-50,  50,  50}, {255,   0,   0, 255}},
+
+    // Back face - Green
+    {{ 50, -50, -50}, {  0, 255,   0, 255}},
+    {{-50, -50, -50}, {  0, 255,   0, 255}},
+    {{-50,  50, -50}, {  0, 255,   0, 255}},
+    {{ 50,  50, -50}, {  0, 255,   0, 255}},
+
+    // Left face - Blue
+    {{-50, -50, -50}, {  0,   0, 255, 255}},
+    {{-50, -50,  50}, {  0,   0, 255, 255}},
+    {{-50,  50,  50}, {  0,   0, 255, 255}},
+    {{-50,  50, -50}, {  0,   0, 255, 255}},
+
+    // Right face - Yellow
+    {{ 50, -50,  50}, {255, 255,   0, 255}},
+    {{ 50, -50, -50}, {255, 255,   0, 255}},
+    {{ 50,  50, -50}, {255, 255,   0, 255}},
+    {{ 50,  50,  50}, {255, 255,   0, 255}},
+
+    // Top face - Magenta
+    {{-50, -50, -50}, {255,   0, 255, 255}},
+    {{ 50, -50, -50}, {255,   0, 255, 255}},
+    {{ 50, -50,  50}, {255,   0, 255, 255}},
+    {{-50, -50,  50}, {255,   0, 255, 255}},
+
+    // Bottom face - Cyan
+    {{-50,  50,  50}, {  0, 255, 255, 255}},
+    {{ 50,  50,  50}, {  0, 255, 255, 255}},
+    {{ 50,  50, -50}, {  0, 255, 255, 255}},
+    {{-50,  50, -50}, {  0, 255, 255, 255}}
+},
+
+{
+    // Front
+     0,  1,  2,
+     2,  3,  0,
+
+    // Back
+     4,  5,  6,
+     6,  7,  4,
+
+    // Left
+     8,  9, 10,
+    10, 11,  8,
+
+    // Right
+    12, 13, 14,
+    14, 15, 12,
+
+    // Top
+    16, 17, 18,
+    18, 19, 16,
+
+    // Bottom
+    20, 21, 22,
+    22, 23, 20
+}
+
 };
 
-struct triangle{
-    Vertex2d VertexA;
-    Vertex2d VertexB;
-    Vertex2d VertexC;    
+
+Mesh2d SquareMesh = {
+{{{100, 100, 1}, {255,255,0,255}},
+{{100, 200, 1}, {255,255,0,255}},
+{{300, 200, 1}, {255,255,0,255}},
+{{300, 100, 1}, {255,255,0,255}}},
+{0, 1, 2, 2, 3, 0}
 };
 
-struct square{
-    Vertex2d Vertices[4];
-    int Indices[6];
+Mesh2d triangeMesh = {
+{{{200, 125, 3}, {100,255,100,255}},
+{{100, 150, 0}, {100,255,100,255}},
+{{300, 150, .85}, {100,255,100,255}}},
+{0, 1, 2}
 };
-
-struct Transformation{
-    Vector2d position;
-    float rotation;
-    Vector2d scale;
-};
-
-struct Mesh2d{
-    std::vector<Vertex2d> Vertices;
-    std::vector<int> Indices; 
-};
-
-struct Determinant{
-    float AB;
-    float BC;
-    float CA;
-};
-
-struct BoundingBoxData{
-    float xmin;
-    float ymin;
-    float xmax;
-    float ymax;
-};
-
-/*
-triangle SRTriangle1 = {
-{{200, 150}, {0 , 0, 255, 255}},
-{{200, 300}, {0 , 0, 255, 255}},
-{{600, 300}, {0 , 0, 255, 255}},
-{{600, 300}, {255, 0, 0, 255}},
-{{600, 150}, {255, 0, 0, 255}},
-{{200, 150}, {255, 0, 0, 255}},
-};
-triangle SRTriangle2 = {
-{{600, 300}, {255, 0, 0, 255}},
-{{600, 150}, {255, 0, 0, 255}},
-{{200, 150}, {255, 0, 0, 255}},
-};
-*/
-
-// (x, y) or (width, height) format
-    int rightTriangle1 [] {
-        200, 150,
-        200, 300,
-        600, 300
-    };
-    int rightTriangle2 [] {
-        600, 300,
-        600, 150,
-        200, 150
-    };
-
-    RGBA operator+(const RGBA &lhs, const RGBA &rhs)
-    {
-        RGBA result;
-        result.red   = lhs.red   + rhs.red;
-        result.green = lhs.green + rhs.red;
-        result.blue  = lhs.blue  + rhs.blue;
-        result.alpha = lhs.alpha + rhs.alpha;
-        return result;
-    }
-    RGBA operator*(const RGBA &lhs, const float &rhs)
-    {
-        RGBA result;
-        result.red   = lhs.red   * rhs;
-        result.green = lhs.green * rhs;
-        result.blue  = lhs.blue  * rhs;
-        result.alpha = lhs.alpha * rhs;
-        return result;
-    }
-
-    Vector2d operator+(const Vector2d &lhs, const Vector2d &rhs)
-    {
-        Vector2d result;
-        result.x = lhs.x + rhs.x;
-        result.y = lhs.y + rhs.y;
-        return result;
-    }
-        Vector2d operator*(const Vector2d &lhs, const Vector2d &rhs)
-    {
-        Vector2d result;
-        result.x = lhs.x * rhs.x;
-        result.y = lhs.y * rhs.y;
-        return result;
-    }
 
 #endif
