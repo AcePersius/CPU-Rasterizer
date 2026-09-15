@@ -2,7 +2,7 @@
 #define TESTMESHES_HPP
 
 Transformation transform{
-{0, 0, 88},
+{0, 0, 10},
 {40, -35, 15},
 {.25, .25, .25}
 };

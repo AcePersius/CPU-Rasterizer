@@ -2,6 +2,8 @@
 #include <SDL3/SDL_main.h>
 // used for std::uint8-32_t
 #include <cstdint>
+// used for std::cout testing
+#include <iostream>
 // used for std::size
 #include <iterator>
 // used for std::min, std::max
@@ -13,11 +15,16 @@
 
 // my supporting files
 #include <structsANDoperators.hpp>
+#include <textsystem.hpp>
+#include <perfANDmonitoring.hpp>
 #include <testmeshes.hpp>
+#include <temp.hpp>
 // end
 
 constexpr float pie = 3.141592;
 
+//TEMP TEST
+Mesh2d TorusMesh = makeTorus();
 
 // Takes in mesh data and sends it to rasterizer
 void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf);
@@ -39,6 +46,7 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData);
 void FramePackager(Vertex &pixel, framebuffer &buffer, auto &meshdata);
 std::uint32_t pixelPackager(RGBA &pixel);
 void fillpixelcolor(RGBA &pixel, auto &meshdata);
+void performanceAndMonitoring(framebuffer &buffer);
 
 
 int main(int argc, char* argv[]) {
@@ -90,42 +98,35 @@ int main(int argc, char* argv[]) {
                 done = true;
             }
         }
+        performanceAndMonitoring(frameBufferData);
 
-        std::fill(
-            frameBufferData.colorPixels.pixels.begin(),
-            frameBufferData.colorPixels.pixels.end(),
-            0x000000FF
-        );
-
-        std::fill(
-            frameBufferData.pixelDepth.depthVals.begin(),
-            frameBufferData.pixelDepth.depthVals.end(),
-            1000.0f
-        );
-
+        std::fill(frameBufferData.colorPixels.pixels.begin(), frameBufferData.colorPixels.pixels.end(), 0x000000FF);
+        std::fill(frameBufferData.pixelDepth.depthVals.begin(), frameBufferData.pixelDepth.depthVals.end(), 1000.0f);
         // RendersMesh
-        RenderMesh(CubeMesh, frameBufferData, transform, cameraTransf);
-        if (transform.position.z >= 140)
+        RenderMesh(TorusMesh, frameBufferData, transform, cameraTransf);
+        drawPerformanceAndMonitoring(frameBufferData);
+        // Cube animation
+        float movementSpeed = 30.0f;
+        float rotationSpeed = 15.0f;
+        if (transform.position.z >= 30)
         {
             moveaway = false;
-            transform.position.z -= 0.1f;
         }
-        else if (transform.position.z <= 60)
+        else if (transform.position.z <= -10)
         {
             moveaway = true;
-            transform.position.z += 0.1f;
         }
         if (moveaway == true)
         {
-            transform.position.z += 0.1f;
+            transform.position.z += movementSpeed * deltaTime;
         }
         if (moveaway == false)
         {
-            transform.position.z -= 0.1f;
+            transform.position.z -= movementSpeed * deltaTime;
         }
-        transform.rotation.x += 0.1f;
-        transform.rotation.y += 0.1f;
-        transform.rotation.z += 0.1f;
+        transform.rotation.x += rotationSpeed * deltaTime;
+        transform.rotation.y += rotationSpeed * deltaTime;
+        transform.rotation.z += rotationSpeed * deltaTime;
 
         // step 11
         SDL_BlitSurface(surface, NULL, SDL_GetWindowSurface(window), NULL);
