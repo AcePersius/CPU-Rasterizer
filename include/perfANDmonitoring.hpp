@@ -33,7 +33,7 @@ void performanceAndMonitoring(framebuffer &buffer)
     {
         statsTimer += deltaTime;
         frameCount ++;
-        if (statsTimer >= 1.0)
+        if (statsTimer >= 0.5)
         {
             AvgFPS = frameCount / statsTimer;
             AvgFrameTimeMS = (statsTimer / frameCount) * 1000.0;
@@ -50,7 +50,7 @@ void performanceAndMonitoring(framebuffer &buffer)
     {
         statsTimer += deltaTime;
         frameCount ++;
-        if (statsTimer >= 1.0)
+        if (statsTimer >= 0.5)
         {
             AvgFPS = frameCount / statsTimer;
             statsTimer = 0.0;
@@ -65,7 +65,7 @@ void performanceAndMonitoring(framebuffer &buffer)
     {
         statsTimer += deltaTime;
         frameCount ++;
-        if (statsTimer >= 1.0)
+        if (statsTimer >= 0.5)
         {
             AvgFrameTimeMS = (statsTimer / frameCount) * 1000.0;
             statsTimer = 0.0;

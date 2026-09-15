@@ -6,6 +6,7 @@
 
 const static int frameWidth = 800;
 const static int frameHeight = 600;
+constexpr float INFINITY_Render_Distance = 9999999.0f;
 
 // Rasterizer Modes relating to determinant values
 // IE if a mesh's vertexes are in a Counter Clockwise Order us CCW
@@ -35,7 +36,7 @@ struct colorBuffer{
 struct depthBuffer{
     std::vector<float> depthVals;
     depthBuffer()
-    : depthVals(frameHeight * frameWidth, 1000.0f)
+    : depthVals(frameHeight * frameWidth, INFINITY_Render_Distance)
     {
     }
 };
@@ -130,7 +131,7 @@ struct BoundingBoxData{
         result.alpha = lhs.alpha - rhs.alpha;
         return result;
     }
-    RGBA operator*(const RGBA &lhs, const float &rhs)
+    RGBA operator*(const RGBA &lhs, const auto &rhs)
     {
         RGBA result;
         result.red   = lhs.red   * rhs;
@@ -139,13 +140,31 @@ struct BoundingBoxData{
         result.alpha = lhs.alpha * rhs;
         return result;
     }
-    RGBA operator*(const float &rhs, const RGBA &lhs)
+    RGBA operator*(const auto &rhs, const RGBA &lhs)
     {
         RGBA result;
         result.red   = lhs.red   * rhs;
         result.green = lhs.green * rhs;
         result.blue  = lhs.blue  * rhs;
         result.alpha = lhs.alpha * rhs;
+        return result;
+    }
+    RGBA operator/(const RGBA &lhs, const auto &rhs)
+    {
+        RGBA result;
+        result.red   = lhs.red   / rhs;
+        result.green = lhs.green / rhs;
+        result.blue  = lhs.blue  / rhs;
+        result.alpha = lhs.alpha / rhs;
+        return result;
+    }
+    RGBA operator/(const auto &rhs, const RGBA &lhs)
+    {
+        RGBA result;
+        result.red   = lhs.red   / rhs;
+        result.green = lhs.green / rhs;
+        result.blue  = lhs.blue  / rhs;
+        result.alpha = lhs.alpha / rhs;
         return result;
     }
         Vector operator+(const Vector &lhs, const Vector &rhs)

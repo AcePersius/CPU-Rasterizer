@@ -21,7 +21,8 @@
 #include <temp.hpp>
 // end
 
-constexpr float pie = 3.141592;
+constexpr float PIE = 3.141592;
+constexpr float EPSILON = .0000001;
 
 //TEMP TEST
 Mesh2d TorusMesh = makeTorus();
@@ -89,6 +90,7 @@ int main(int argc, char* argv[]) {
 
     // TEMP
     bool moveaway = true;
+    Transformation OriginalTransform = transform;
 
     while (!done) {
         SDL_Event event;
@@ -101,18 +103,19 @@ int main(int argc, char* argv[]) {
         performanceAndMonitoring(frameBufferData);
 
         std::fill(frameBufferData.colorPixels.pixels.begin(), frameBufferData.colorPixels.pixels.end(), 0x000000FF);
-        std::fill(frameBufferData.pixelDepth.depthVals.begin(), frameBufferData.pixelDepth.depthVals.end(), 1000.0f);
-        // RendersMesh
+        std::fill(frameBufferData.pixelDepth.depthVals.begin(), frameBufferData.pixelDepth.depthVals.end(), INFINITY_Render_Distance);
+        // RendersMesh TorusMesh, SquareMesh, triangleMesh
         RenderMesh(TorusMesh, frameBufferData, transform, cameraTransf);
         drawPerformanceAndMonitoring(frameBufferData);
         // Cube animation
         float movementSpeed = 30.0f;
         float rotationSpeed = 15.0f;
-        if (transform.position.z >= 30)
+        
+        if (transform.position.z >= OriginalTransform.position.z +30)
         {
             moveaway = false;
         }
-        else if (transform.position.z <= -10)
+        else if (transform.position.z <= OriginalTransform.position.z -10)
         {
             moveaway = true;
         }
@@ -127,6 +130,7 @@ int main(int argc, char* argv[]) {
         transform.rotation.x += rotationSpeed * deltaTime;
         transform.rotation.y += rotationSpeed * deltaTime;
         transform.rotation.z += rotationSpeed * deltaTime;
+        
 
         // step 11
         SDL_BlitSurface(surface, NULL, SDL_GetWindowSurface(window), NULL);
@@ -164,7 +168,7 @@ void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation
 
         toCameraSpace(triangleBuffer.VertexA, cameraTransf);
         toCameraSpace(triangleBuffer.VertexB, cameraTransf);
-        toCameraSpace(triangleBuffer.VertexC, cameraTransf);        
+        toCameraSpace(triangleBuffer.VertexC, cameraTransf);   
 
         std::vector<triangle> clippedTriangles = nearPlaneClipping(triangleBuffer);
         if (clippedTriangles.size() == 0)
@@ -202,27 +206,27 @@ void toWorldSpace(Vertex &Vertex, Transformation const &transform)
     y = Vertex.position.y;
     z = Vertex.position.z;
     Vertex.position.x = x;
-    Vertex.position.y = y * std::cos((transform.rotation.x * pie) / 180) - 
-        z * std::sin((transform.rotation.x * pie) / 180);
-    Vertex.position.z = y * std::sin((transform.rotation.x * pie) / 180) + 
-        z * std::cos((transform.rotation.x * pie) / 180);
+    Vertex.position.y = y * std::cos((transform.rotation.x * PIE) / 180) - 
+        z * std::sin((transform.rotation.x * PIE) / 180);
+    Vertex.position.z = y * std::sin((transform.rotation.x * PIE) / 180) + 
+        z * std::cos((transform.rotation.x * PIE) / 180);
     // Rotation around y (yaw):
     x = Vertex.position.x;
     y = Vertex.position.y;
     z = Vertex.position.z;
-    Vertex.position.x = x * std::cos((transform.rotation.y * pie) / 180) + 
-        z * std::sin((transform.rotation.y * pie) / 180);
+    Vertex.position.x = x * std::cos((transform.rotation.y * PIE) / 180) + 
+        z * std::sin((transform.rotation.y * PIE) / 180);
     Vertex.position.y = y;
-    Vertex.position.z = -x * std::sin((transform.rotation.y * pie) / 180) + 
-        z * std::cos((transform.rotation.y * pie) / 180);
+    Vertex.position.z = -x * std::sin((transform.rotation.y * PIE) / 180) + 
+        z * std::cos((transform.rotation.y * PIE) / 180);
     // Rotation around Z (roll):
     x = Vertex.position.x;
     y = Vertex.position.y;
     z = Vertex.position.z;
-    Vertex.position.x =  x * std::cos((transform.rotation.z * pie) / 180) -
-        y * std::sin((transform.rotation.z * pie) / 180);
-    Vertex.position.y =  x * std::sin((transform.rotation.z * pie) / 180) +
-        y * std::cos((transform.rotation.z * pie) / 180);
+    Vertex.position.x =  x * std::cos((transform.rotation.z * PIE) / 180) -
+        y * std::sin((transform.rotation.z * PIE) / 180);
+    Vertex.position.y =  x * std::sin((transform.rotation.z * PIE) / 180) +
+        y * std::cos((transform.rotation.z * PIE) / 180);
     Vertex.position.z = z;
     // For Position
     Vertex.position =  Vertex.position + transform.position;
@@ -242,28 +246,28 @@ void toCameraSpace(Vertex &Vertex, Camera const &cameraTransf)
     x = Vertex.position.x;
     y = Vertex.position.y;
     z = Vertex.position.z;
-    Vertex.position.x =  x * std::cos((-cameraTransf.CamRota.z * pie) / 180) -
-        y * std::sin((-cameraTransf.CamRota.z * pie) / 180);
-    Vertex.position.y =  x * std::sin((-cameraTransf.CamRota.z * pie) / 180) +
-        y * std::cos((-cameraTransf.CamRota.z * pie) / 180);
+    Vertex.position.x =  x * std::cos((-cameraTransf.CamRota.z * PIE) / 180) -
+        y * std::sin((-cameraTransf.CamRota.z * PIE) / 180);
+    Vertex.position.y =  x * std::sin((-cameraTransf.CamRota.z * PIE) / 180) +
+        y * std::cos((-cameraTransf.CamRota.z * PIE) / 180);
     // Rotation around y (yaw):
     x = Vertex.position.x;
     y = Vertex.position.y;
     z = Vertex.position.z;
-    Vertex.position.x = x * std::cos((-cameraTransf.CamRota.y * pie) / 180) + 
-        z * std::sin((-cameraTransf.CamRota.y * pie) / 180);
+    Vertex.position.x = x * std::cos((-cameraTransf.CamRota.y * PIE) / 180) + 
+        z * std::sin((-cameraTransf.CamRota.y * PIE) / 180);
     Vertex.position.y = y;
-    Vertex.position.z = -x * std::sin((-cameraTransf.CamRota.y * pie) / 180) + 
-        z * std::cos((-cameraTransf.CamRota.y * pie) / 180);
+    Vertex.position.z = -x * std::sin((-cameraTransf.CamRota.y * PIE) / 180) + 
+        z * std::cos((-cameraTransf.CamRota.y * PIE) / 180);
     // Rotation around X (pitch):
     x = Vertex.position.x;
     y = Vertex.position.y;
     z = Vertex.position.z;
     Vertex.position.x = x;
-    Vertex.position.y = y * std::cos((-cameraTransf.CamRota.x * pie) / 180) - 
-        z * std::sin((-cameraTransf.CamRota.x * pie) / 180);
-    Vertex.position.z = y * std::sin((-cameraTransf.CamRota.x * pie) / 180) + 
-        z * std::cos((-cameraTransf.CamRota.x * pie) / 180);
+    Vertex.position.y = y * std::cos((-cameraTransf.CamRota.x * PIE) / 180) - 
+        z * std::sin((-cameraTransf.CamRota.x * PIE) / 180);
+    Vertex.position.z = y * std::sin((-cameraTransf.CamRota.x * PIE) / 180) + 
+        z * std::cos((-cameraTransf.CamRota.x * PIE) / 180);
 }
 
 std::vector<triangle> nearPlaneClipping(triangle &triangleBuffer)
@@ -364,11 +368,12 @@ void toScreenSpace(Vertex &Vertex)
 {
     // Converting to Screen Coordinates aka centers object
     Vertex.position.x = Vertex.position.x + (frameWidth / 2);
-    Vertex.position.y = Vertex.position.y + (frameHeight / 2);
+    // This Y flip is very important to note, it flips Winding logic
+    // A lot of rework had to be done to reflect this single flip
+    Vertex.position.y = -Vertex.position.y + (frameHeight / 2);
 }
 
-// Rasterizer
-// Step 2, follow rasterizing steps
+
 void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
 {
     // For this data xyMinMax comes in the format of:
@@ -377,69 +382,87 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
     BoundingBoxData xyMinMax = boundingBox(meshdata);
     // Top Left Fill Rule https://kristoffer-dyrkorn.github.io/triangle-rasterizer/4
     // determinantOffset can also be thought of as a true/false for IsTopleft true/false
-    // Might change this later to that name instead
-    // Step 4
-    bool detABoffset = TopLeftFillFunc(meshdata.VertexA.position, meshdata.VertexB.position);
-    bool detBCoffset = TopLeftFillFunc(meshdata.VertexB.position, meshdata.VertexC.position);
-    bool detCAoffset = TopLeftFillFunc(meshdata.VertexC.position, meshdata.VertexA.position);
+    // IF is TOP or LEFT, function is TRUE and 
+    bool ABisTopOrLeft = TopLeftFillFunc(meshdata.VertexA.position, meshdata.VertexB.position);
+    bool BCisTopOrLeft = TopLeftFillFunc(meshdata.VertexB.position, meshdata.VertexC.position);
+    bool CAisTopOrLeft = TopLeftFillFunc(meshdata.VertexC.position, meshdata.VertexA.position);
     // This p vector serves as the vector data to be filled in during the loop
     Vertex pixel;
+
+    // Discard Straight-Line Triangles
+    float testForDegenerateTriangle;
+    testForDegenerateTriangle = getDeterminant(meshdata.VertexA.position, meshdata.VertexB.position, meshdata.VertexC.position);
+    if (std::abs(testForDegenerateTriangle) < EPSILON)
+    {
+        return;
+    }
+
     for (int y = xyMinMax.ymin; y <= xyMinMax.ymax; y++)
     {
         for (int x = xyMinMax.xmin; x <= xyMinMax.xmax; x++)
-        
         {
             // update pixel values to current x,y coord
             pixel.position.x = x;
             pixel.position.y = y;
-            // Step 5
+
             Determinant determinants;
                 determinants.AB = getDeterminant(meshdata.VertexA.position, meshdata.VertexB.position, pixel.position);
                 determinants.BC = getDeterminant(meshdata.VertexB.position, meshdata.VertexC.position, pixel.position);
                 determinants.CA = getDeterminant(meshdata.VertexC.position, meshdata.VertexA.position, pixel.position);
+            
+            /* For CCW in OBJECT/WORLD SPACE, a point inside of the triangle has all negative determinant values.
+             For CW in OBJECT/WORLD SPACE, a point inside of the triangle has all positive determinant values.
+             With my current implementation, the current windingModes reflect Object Space CCW/CW.
+             This is not the same as my Screen Space CCW/CW winding, because Object/World Space works on a +x = right and +y = up,
+             This is NOT the same in Screen Space, Why? Because screen space coordinates have 0,0 in the TOP LEFT of the screen therefore
+             everything on screen is +x = right and +y = DOWN where a bigger Y value means its lower on the screen. So when we do toScreenSpace
+             we actually have to flip the sign of the y value. This incidentally swaps the sign of determinant values. This creates a conundrum as
+             Object/World space CCW/CW and ScreenSpace CCW/CW are opposites. There are a few ways to go about this, such as swapping the signs of
+             the results from getDeterminants, but other functions such as TopLeftFillFunc relies on the determinant values. Ive decided to instead
+             edit the Rasterizer's Switch and Case setup to calculats what is labeled CCW as CW and vice versa.
+             So HERE CCW, a point inside of the triangle has all POSITIVE determinant values.
+             HERE CW, a point inside of the triangle has all NEGATIVE determinant values.
+            */
             switch (frameBufferData.WindingMode) // Step 6
             {
-            case CW:
-                /* Note explaining the detoffset, the current offset checker for is a CCW, luckily we can still 
-                   use the results from that function, BUT the values associated with determinants that are CW 
-                   are opposite of CCW, IE negative not positive. that explains the flipped < operator, similar
-                   logic applies to the offset. Due to the offset function be made for CCW, the CW options of 
-                   0 and -1 need to be flipped to -1 and 0 because CCW true is CW false
-                */
-                if ((determinants.AB <= (detABoffset ? -.00001 : 0)) && (determinants.BC  <= (detBCoffset ? -.00001 : 0)) 
-                && (determinants.CA <= (detCAoffset ? -.00001 : 0)))
+            case CW: // Points are NEGATIVE inside of the triangle
+                // How the 0 : Epsilon Offset works In order to avoid potential conflict of two triangles claiming the SAME
+                // pixel, we called the TopLeftFillFunc to determin if the line being check IE A->B/B->C/C->A is a TOP or Left edge.
+                // If it IS, then it is INCLUSIONARY of 0. Therefore if (for example) ABisTopOrLeft is TRUE, determinants.AB <= 0 is
+                // inclusionary so points with exactly 0 belong to that triangle. The Offset kicks in in order to make the cutoff slightly
+                // NOT 0, so if the point lands on the line exactly it gets EXCLUDED. This needs to be NEGATIVE for SCREENVIEW CW (negative-inside raster case)
+                // because SCREENVIEW CW in this case likes all NEGATIVE determinant points. The required sign is POSITIVE for SCREENVIEW CCW (positive-inside raster case).
+                if ((determinants.AB <= (ABisTopOrLeft ? 0 : -EPSILON)) && (determinants.BC  <= (BCisTopOrLeft ? 0 : -EPSILON)) 
+                && (determinants.CA <= (CAisTopOrLeft ? 0 : -EPSILON)))
                 {
                     barycentrics(determinants, meshdata, pixel);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
             
-            case Both:
-                if (((determinants.AB >= (detABoffset ? 0 : .00001)) && (determinants.BC  >= (detBCoffset ? 0 : .00001)) 
-                && (determinants.CA >= (detCAoffset ? 0 : .00001))) || ((determinants.AB <= (detABoffset ? -.00001 : 0)) 
-                && (determinants.BC  <= (detBCoffset ? -.00001 : 0)) && (determinants.CA <= (detCAoffset ? -.00001 : 0))))
+            case Both: // Points are POSITIVE or NEGATIVE inside of the triangle
+                if (((determinants.AB >= (ABisTopOrLeft ? 0 : EPSILON)) && (determinants.BC  >= (BCisTopOrLeft ? 0 : EPSILON)) 
+                && (determinants.CA >= (CAisTopOrLeft ? 0 : EPSILON))) || ((determinants.AB <= (ABisTopOrLeft ? 0 : -EPSILON)) 
+                && (determinants.BC  <= (BCisTopOrLeft ? 0 : -EPSILON)) && (determinants.CA <= (CAisTopOrLeft ? 0 : -EPSILON))))
                 {
                     barycentrics(determinants, meshdata, pixel);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
 
-            default: //default is CCW
-                if ((determinants.AB >= (detABoffset ? 0 : .00001)) && (determinants.BC  >= (detBCoffset ? 0 : .00001)) 
-                && (determinants.CA >= (detCAoffset ? 0 : .00001)))
+            default: //default is CCW // Points are POSITIVE inside of the triangle
+                if ((determinants.AB >= (ABisTopOrLeft ? 0 : EPSILON)) && (determinants.BC  >= (BCisTopOrLeft ? 0 : EPSILON)) 
+                && (determinants.CA >= (CAisTopOrLeft ? 0 : EPSILON)))
                 {
                     barycentrics(determinants, meshdata, pixel);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
             }
-
         }
     }
-
 }
 // Finding candidate pixels aka Creating Bounding Box
-// Step 3
 BoundingBoxData boundingBox(auto &meshdata)
 {
     // https://kristoffer-dyrkorn.github.io/triangle-rasterizer/1
@@ -451,10 +474,10 @@ BoundingBoxData boundingBox(auto &meshdata)
     xyMinMax.ymin = (xyMinMax.ymin < 0) ? 0: xyMinMax.ymin;
 
     xyMinMax.xmax = std::max(meshdata.VertexA.position.x, std::max(meshdata.VertexB.position.x, meshdata.VertexC.position.x));
-    xyMinMax.xmax = (xyMinMax.xmax > frameWidth) ? frameWidth - 1: xyMinMax.xmax;
+    xyMinMax.xmax = (xyMinMax.xmax >= frameWidth) ? frameWidth - 1: xyMinMax.xmax;
 
     xyMinMax.ymax = std::max(meshdata.VertexA.position.y, std::max(meshdata.VertexB.position.y, meshdata.VertexC.position.y));
-    xyMinMax.ymax = (xyMinMax.ymax > frameHeight) ? frameHeight - 1: xyMinMax.ymax;
+    xyMinMax.ymax = (xyMinMax.ymax >= frameHeight) ? frameHeight - 1: xyMinMax.ymax;
     return xyMinMax;
 }
 // Finding determinant-Offeset for the topleft fill rule
@@ -464,7 +487,7 @@ bool TopLeftFillFunc(Vector &start, Vector &end)
     float edge[2];
     edge[0] = end.x - start.x;
     edge[1] = end.y - start.y;
-    bool isLeftEdge = edge[1] > 0;
+    bool isLeftEdge = edge[1] < 0;
     bool isTopEdge  = edge[1] == 0 && edge[0] < 0;
     return isLeftEdge || isTopEdge;
 }
@@ -516,14 +539,26 @@ void FramePackager(Vertex &pixel, framebuffer &buffer, auto &meshdata)
     buffer.colorPixels.pixels[indice] = packed_pixel;
 }
 
-// step 9
+// Takes pixel color values RGBA and turns them from floats to bits
+// packed into a 32 bit packet of color info
 std::uint32_t pixelPackager(RGBA &pixel)
 {
     std::uint32_t packed_pixel {0};
-    packed_pixel |= static_cast<std::uint32_t>(pixel.red) << 24;
+    // Restrict color values to 0-255, this is done because BarycentricColoring
+    // can potentially produce values greater than 255 or less than 0
+    if (pixel.red   > 255){pixel.red   = 255;}
+    if (pixel.green > 255){pixel.green = 255;}
+    if (pixel.blue  > 255){pixel.blue  = 255;}
+    if (pixel.alpha > 255){pixel.alpha = 255;}
+    if (pixel.red   < 0){pixel.red   = 0;}
+    if (pixel.green < 0){pixel.green = 0;}
+    if (pixel.blue  < 0){pixel.blue  = 0;}
+    if (pixel.alpha < 0){pixel.alpha = 0;}
+
+    packed_pixel |= static_cast<std::uint32_t>(pixel.red)   << 24;
     packed_pixel |= static_cast<std::uint32_t>(pixel.green) << 16;
-    packed_pixel |= static_cast<std::uint32_t>(pixel.blue) << 8;
-    packed_pixel |= static_cast<std::uint32_t>(pixel.alpha) << 0;
+    packed_pixel |= static_cast<std::uint32_t>(pixel.blue)  <<  8;
+    packed_pixel |= static_cast<std::uint32_t>(pixel.alpha) <<  0;
     return packed_pixel;
 }
 
@@ -547,27 +582,25 @@ void barycentrics(Determinant &determinants, auto &meshdata, Vertex &pixel)
 void barycentricColor(Determinant &determinants, auto &meshdata, Vertex &pixel)
 {
     float totalDeterminant = determinants.AB + determinants.BC + determinants.CA;
-    if (totalDeterminant == 0)
-    {
-        totalDeterminant = 1;
-    }
     float percentageA = std::abs((determinants.BC) / totalDeterminant);
-    RGBA A = meshdata.VertexA.colorData * percentageA;
     float percentageB = std::abs((determinants.CA) / totalDeterminant);
-    RGBA B = meshdata.VertexB.colorData * percentageB;
     float percentageC = std::abs((determinants.AB) / totalDeterminant);
-    RGBA C = meshdata.VertexC.colorData * percentageC;
+    RGBA colorOverZA = meshdata.VertexA.colorData / meshdata.VertexA.position.z;
+    RGBA colorOverZB = meshdata.VertexB.colorData / meshdata.VertexB.position.z;
+    RGBA colorOverZC = meshdata.VertexC.colorData / meshdata.VertexC.position.z;
 
-    pixel.colorData = A + B + C;
+    RGBA interpolatedColorOverZ = colorOverZA * percentageA + colorOverZB * percentageB + colorOverZC * percentageC;
+
+    float inverseZ = (1.0 / meshdata.VertexA.position.z) * percentageA +
+        (1.0 / meshdata.VertexB.position.z) * percentageB +
+        (1.0 / meshdata.VertexC.position.z) * percentageC;
+
+    pixel.colorData = interpolatedColorOverZ / inverseZ;
 }
 
 void barycentricZ(Determinant &determinants, auto &meshdata, Vertex &pixel)
 {
     float totalDeterminant = determinants.AB + determinants.BC + determinants.CA;
-    if (totalDeterminant == 0)
-    {
-        totalDeterminant = 1;
-    }
     float percentageA = std::abs((determinants.BC) / totalDeterminant);
     float percentageB = std::abs((determinants.CA) / totalDeterminant);
     float percentageC = std::abs((determinants.AB) / totalDeterminant);

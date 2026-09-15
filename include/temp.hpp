@@ -65,12 +65,12 @@ inline Mesh2d makeTorus(
             int D = i     * minorSegments + nextJ;
 
             torus.Indices.push_back(A);
-            torus.Indices.push_back(D);
             torus.Indices.push_back(B);
+            torus.Indices.push_back(D);
 
             torus.Indices.push_back(B);
-            torus.Indices.push_back(D);
             torus.Indices.push_back(C);
+            torus.Indices.push_back(D);
         }
     }
 
