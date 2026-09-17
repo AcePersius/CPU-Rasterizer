@@ -7,6 +7,7 @@
 const static int frameWidth = 800;
 const static int frameHeight = 600;
 constexpr float INFINITY_Render_Distance = 9999999.0f;
+constexpr float PIE = 3.141592;
 
 // Rasterizer Modes relating to determinant values
 // IE if a mesh's vertexes are in a Counter Clockwise Order us CCW
@@ -88,11 +89,6 @@ struct Transformation{
     Vector scale;
 };
 
-struct Camera{
-    Vector CamPos;
-    Vector CamRota;
-};
-
 struct Mesh2d{
     std::vector<Vertex> Vertices;
     std::vector<int> Indices; 
@@ -111,7 +107,137 @@ struct BoundingBoxData{
     float ymax;
 };
 
+struct Vector4D{
+    float x;
+    float y;
+    float z;
+    float w;
+};
 
+struct Matrix4x4{
+    float matrix[4][4];
+};
+
+float tx;
+float ty;
+float tz;
+
+Matrix4x4 BaseMatrix{
+    {{1, 0, 0, 0},
+     {0, 1, 0, 0},
+     {0, 0, 1, 0},
+     {0, 0, 0, 1}}
+};
+
+Matrix4x4 Translation{
+    {{1, 0, 0, 1},
+     {0, 1, 0, 1},
+     {0, 0, 1, 1},
+     {0, 0, 0, 1}}
+};
+
+Matrix4x4 Scale{
+    {{1, 0, 0, 0},
+     {0, 1, 0, 0},
+     {0, 0, 1, 0},
+     {0, 0, 0, 1}}
+};
+
+// Because I chose to use Column Vectors, I must do Matrix rows * Vector columns
+// Order also Matters when it comes to Applying Matrices to our 4D vector:
+// Matrices A * B * C * Vectord4D D read right to left in order that must be done so:
+//  A * (B * (C * D)
+Vector4D operator*(Matrix4x4 lhs,Vector4D rhs)
+{
+    Vector4D buffer;
+    buffer.x = lhs.matrix[0][0] * rhs.x + lhs.matrix[0][1] * rhs.y + lhs.matrix[0][2] * rhs.z + lhs.matrix[0][3] * rhs.w;
+    buffer.y = lhs.matrix[1][0] * rhs.x + lhs.matrix[1][1] * rhs.y + lhs.matrix[1][2] * rhs.z + lhs.matrix[1][3] * rhs.w;
+    buffer.z = lhs.matrix[2][0] * rhs.x + lhs.matrix[2][1] * rhs.y + lhs.matrix[2][2] * rhs.z + lhs.matrix[2][3] * rhs.w;
+    buffer.w = lhs.matrix[3][0] * rhs.x + lhs.matrix[3][1] * rhs.y + lhs.matrix[3][2] * rhs.z + lhs.matrix[3][3] * rhs.w;
+    return buffer;
+};
+
+Vector4D toVector4D(Vector threeD)
+{
+    Vector4D buffer;
+    buffer.x = threeD.x;
+    buffer.y = threeD.y;
+    buffer.z = threeD.z;
+    buffer.w = 1;
+    return buffer;
+};
+
+Vector toVector(Vector4D fourD)
+{
+    Vector buffer;
+    buffer.x = fourD.x;
+    buffer.y = fourD.y;
+    buffer.z = fourD.z;
+    return buffer;
+};
+
+// Standard Matrix Multiplication is Matrix A's rows * Matrix B's Columns
+// Something I learned! Matrix Math is non-communicative, but it is associative!
+// What does that mean? There are particular rules such as:
+// ORDER matters: A × B ≠ B × A, but GROUPING does not: (A × B) × C = A × (B × C)
+Matrix4x4 operator*(Matrix4x4 lhs_rows,Matrix4x4 rhs_columns)
+{
+    Matrix4x4 buffer {0};
+    for (int i = 0; i < 4; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            for (int k = 0; k < 4; k++)
+            buffer.matrix[i][j] += lhs_rows.matrix[i][k]* rhs_columns.matrix[k][j];
+        }
+    }
+    return buffer;
+};
+
+Matrix4x4 toTranslationMatrix(Matrix4x4 BaseMatrix, const float &tx, const float &ty, const float &tz)
+{
+    BaseMatrix.matrix[0][3] = tx;
+    BaseMatrix.matrix[1][3] = ty;
+    BaseMatrix.matrix[2][3] = tz;
+    return BaseMatrix;
+}
+
+Matrix4x4 toScaleMatrix(Matrix4x4 BaseMatrix, const float &tx, const float &ty, const float &tz)
+{
+    BaseMatrix.matrix[0][0] = tx;
+    BaseMatrix.matrix[1][1] = ty;
+    BaseMatrix.matrix[2][2] = tz;
+    return BaseMatrix;
+}
+
+// Consider Cleaning up the trig calls and calculation degrees to
+// Radians once in the function instead of everytime
+Matrix4x4 toRotateXMatrix(Matrix4x4 BaseMatrix, const float angle)
+{
+    BaseMatrix.matrix[1][1] =  std::cos(((angle * PIE) / 180));
+    BaseMatrix.matrix[1][2] = -std::sin(((angle * PIE) / 180));
+    BaseMatrix.matrix[2][1] =  std::sin(((angle * PIE) / 180));
+    BaseMatrix.matrix[2][2] =  std::cos(((angle * PIE) / 180));
+    return BaseMatrix;
+}
+
+Matrix4x4 toRotateYMatrix(Matrix4x4 BaseMatrix, const float angle)
+{
+    BaseMatrix.matrix[0][0] =  std::cos(((angle * PIE) / 180));
+    BaseMatrix.matrix[0][2] =  std::sin(((angle * PIE) / 180));
+    BaseMatrix.matrix[2][0] = -std::sin(((angle * PIE) / 180));
+    BaseMatrix.matrix[2][2] =  std::cos(((angle * PIE) / 180));
+    return BaseMatrix;
+}
+
+Matrix4x4 toRotateZMatrix(Matrix4x4 BaseMatrix, const float angle)
+{
+    BaseMatrix.matrix[0][0] =  std::cos(((angle * PIE) / 180));
+    BaseMatrix.matrix[0][1] = -std::sin(((angle * PIE) / 180));
+    BaseMatrix.matrix[1][0] =  std::sin(((angle * PIE) / 180));
+    BaseMatrix.matrix[1][1] =  std::cos(((angle * PIE) / 180));
+    return BaseMatrix;
+}
 
 RGBA operator+(const RGBA &lhs, const RGBA &rhs)
 {

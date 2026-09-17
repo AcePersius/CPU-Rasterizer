@@ -21,16 +21,17 @@
 #include <temp.hpp>
 // end
 
-constexpr float PIE = 3.141592;
 constexpr float EPSILON = .0000001;
 
 //TEMP TEST
 Mesh2d TorusMesh = makeTorus();
 
 // Takes in mesh data and sends it to rasterizer
-void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf);
-void toWorldSpace(Vertex &Vertex, Transformation const &transform);
-void toCameraSpace(Vertex &Vertex, Camera const &cameraTransf);
+void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Transformation const &cameraTransf);
+Matrix4x4 createWorldSpaceMatrix(Transformation const &transform);
+Matrix4x4 createCameraSpaceMatrix(Transformation const &cameraTransf);
+void toWorldSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toWorldMatrix);
+void toCameraSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toCameraMatrix);
 std::vector<triangle> nearPlaneClipping(triangle &triangleBuffer);
 void processEdge(Vertex &Vertex1, Vertex &Vertex2, std::vector<Vertex> &clippedTriangle);
 void perspectiveProjection(Vertex &Vertex);
@@ -147,7 +148,7 @@ int main(int argc, char* argv[]) {
 }
 
 
-void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf)
+void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Transformation const &cameraTransf)
 {
     // Buffer for drawing triangles
     if (mesh.Indices.size() % 3 != 0)
@@ -155,6 +156,8 @@ void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation
         return;
     }
 
+    Matrix4x4 toWorldSpaceMatrix = createWorldSpaceMatrix(transform);
+    Matrix4x4 toCameraSpaceMatrix = createCameraSpaceMatrix(cameraTransf);
         for(std::size_t i = 0; i < (mesh.Indices.size()); i+=3)
     {
         triangle triangleBuffer {0};
@@ -162,13 +165,21 @@ void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation
         triangleBuffer.VertexB = mesh.Vertices[mesh.Indices[i+1]];
         triangleBuffer.VertexC = mesh.Vertices[mesh.Indices[i+2]];
 
-        toWorldSpace(triangleBuffer.VertexA, transform);
-        toWorldSpace(triangleBuffer.VertexB, transform);
-        toWorldSpace(triangleBuffer.VertexC, transform);
+        Vector4D buffer4DA {0};
+        Vector4D buffer4DB {0};
+        Vector4D buffer4DC {0};
+        buffer4DA = toVector4D(triangleBuffer.VertexA.position);
+        buffer4DB = toVector4D(triangleBuffer.VertexB.position);
+        buffer4DC = toVector4D(triangleBuffer.VertexC.position);
 
-        toCameraSpace(triangleBuffer.VertexA, cameraTransf);
-        toCameraSpace(triangleBuffer.VertexB, cameraTransf);
-        toCameraSpace(triangleBuffer.VertexC, cameraTransf);   
+        toWorldSpace(buffer4DA, buffer4DB, buffer4DC, toWorldSpaceMatrix);
+
+        toCameraSpace(buffer4DA, buffer4DB, buffer4DC, toCameraSpaceMatrix);
+
+
+        triangleBuffer.VertexA.position = toVector(buffer4DA);
+        triangleBuffer.VertexB.position = toVector(buffer4DB);
+        triangleBuffer.VertexC.position = toVector(buffer4DC);
 
         std::vector<triangle> clippedTriangles = nearPlaneClipping(triangleBuffer);
         if (clippedTriangles.size() == 0)
@@ -190,84 +201,55 @@ void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation
         }
     }
 }
-// Apply Transformation Properties
-// double check rotation for rotating around the middle pixel rather than rotating around where the triange actually should be
-// Consider calculating the sin and cos before the function rather than having to redo the calculation every time
-void toWorldSpace(Vertex &Vertex, Transformation const &transform)
+
+// New implementation of Converting from Object Space to World space using transform Matrices
+Matrix4x4 createWorldSpaceMatrix(Transformation const &transform)
 {
-    // For Scale
-    Vertex.position = Vertex.position * transform.scale;
-    // For Rotation
-    float x;
-    float y;
-    float z;
-    // Rotation around X (pitch):
-    x = Vertex.position.x;
-    y = Vertex.position.y;
-    z = Vertex.position.z;
-    Vertex.position.x = x;
-    Vertex.position.y = y * std::cos((transform.rotation.x * PIE) / 180) - 
-        z * std::sin((transform.rotation.x * PIE) / 180);
-    Vertex.position.z = y * std::sin((transform.rotation.x * PIE) / 180) + 
-        z * std::cos((transform.rotation.x * PIE) / 180);
-    // Rotation around y (yaw):
-    x = Vertex.position.x;
-    y = Vertex.position.y;
-    z = Vertex.position.z;
-    Vertex.position.x = x * std::cos((transform.rotation.y * PIE) / 180) + 
-        z * std::sin((transform.rotation.y * PIE) / 180);
-    Vertex.position.y = y;
-    Vertex.position.z = -x * std::sin((transform.rotation.y * PIE) / 180) + 
-        z * std::cos((transform.rotation.y * PIE) / 180);
-    // Rotation around Z (roll):
-    x = Vertex.position.x;
-    y = Vertex.position.y;
-    z = Vertex.position.z;
-    Vertex.position.x =  x * std::cos((transform.rotation.z * PIE) / 180) -
-        y * std::sin((transform.rotation.z * PIE) / 180);
-    Vertex.position.y =  x * std::sin((transform.rotation.z * PIE) / 180) +
-        y * std::cos((transform.rotation.z * PIE) / 180);
-    Vertex.position.z = z;
-    // For Position
-    Vertex.position =  Vertex.position + transform.position;
+    // Declarations For Transformation Matrices
+    Matrix4x4 Scale;
+    Matrix4x4 RotationX;
+    Matrix4x4 RotationY;
+    Matrix4x4 RotationZ;
+    Matrix4x4 Translation;
+    Scale = toScaleMatrix(BaseMatrix, transform.scale.x, transform.scale.y, transform.scale.z);
+    RotationX = toRotateXMatrix(BaseMatrix, transform.rotation.x);
+    RotationY = toRotateYMatrix(BaseMatrix, transform.rotation.y);
+    RotationZ = toRotateZMatrix(BaseMatrix, transform.rotation.z);
+    Translation = toTranslationMatrix(BaseMatrix, transform.position.x, transform.position.y, transform.position.z);
+    Matrix4x4 toWorldMatrix = (Translation *(RotationZ *(RotationY *(RotationX * Scale))));
+    return toWorldMatrix;
 }
 
-// This functions is basically the inverse of transformVerPos
-void toCameraSpace(Vertex &Vertex, Camera const &cameraTransf)
+// New implementation of Converting from Object Space to World space using transform Matrices
+Matrix4x4 createCameraSpaceMatrix(Transformation const &cameraTransf)
 {
-    // For Position
-    Vertex.position = Vertex.position - cameraTransf.CamPos;    
-    // For Rotation
-    float x;
-    float y;
-    float z;
+    // Declarations For Transformation Matrices
+    Matrix4x4 RotationX;
+    Matrix4x4 RotationY;
+    Matrix4x4 RotationZ;
+    Matrix4x4 Translation;
+    // The following functions have negative values because Camera transformations are inverse transformations
+    // IE if you look right, the world moves left and vice versa. Same with up and down
+    RotationX = toRotateXMatrix(BaseMatrix, -cameraTransf.rotation.x);
+    RotationY = toRotateYMatrix(BaseMatrix, -cameraTransf.rotation.y);
+    RotationZ = toRotateZMatrix(BaseMatrix, -cameraTransf.rotation.z);
+    Translation = toTranslationMatrix(BaseMatrix, -cameraTransf.position.x, -cameraTransf.position.y, -cameraTransf.position.z);
+    Matrix4x4 toCamMatrix  = (RotationX *(RotationY *(RotationZ * Translation)));
+    return toCamMatrix;
+}
 
-    // Rotation around Z (roll):
-    x = Vertex.position.x;
-    y = Vertex.position.y;
-    z = Vertex.position.z;
-    Vertex.position.x =  x * std::cos((-cameraTransf.CamRota.z * PIE) / 180) -
-        y * std::sin((-cameraTransf.CamRota.z * PIE) / 180);
-    Vertex.position.y =  x * std::sin((-cameraTransf.CamRota.z * PIE) / 180) +
-        y * std::cos((-cameraTransf.CamRota.z * PIE) / 180);
-    // Rotation around y (yaw):
-    x = Vertex.position.x;
-    y = Vertex.position.y;
-    z = Vertex.position.z;
-    Vertex.position.x = x * std::cos((-cameraTransf.CamRota.y * PIE) / 180) + 
-        z * std::sin((-cameraTransf.CamRota.y * PIE) / 180);
-    Vertex.position.y = y;
-    Vertex.position.z = -x * std::sin((-cameraTransf.CamRota.y * PIE) / 180) + 
-        z * std::cos((-cameraTransf.CamRota.y * PIE) / 180);
-    // Rotation around X (pitch):
-    x = Vertex.position.x;
-    y = Vertex.position.y;
-    z = Vertex.position.z;
-    Vertex.position.x = x;
-    Vertex.position.y = y * std::cos((-cameraTransf.CamRota.x * PIE) / 180) - 
-        z * std::sin((-cameraTransf.CamRota.x * PIE) / 180);
-    Vertex.position.z = y * std::sin((-cameraTransf.CamRota.x * PIE) / 180) + 
-        z * std::cos((-cameraTransf.CamRota.x * PIE) / 180);
+void toWorldSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toWorldMatrix)
+{
+    vector4DA = toWorldMatrix * vector4DA;
+    vector4DB = toWorldMatrix * vector4DB;
+    vector4DC = toWorldMatrix * vector4DC;
+}
+
+void toCameraSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toCameraMatrix)
+{
+    vector4DA = toCameraMatrix * vector4DA;
+    vector4DB = toCameraMatrix * vector4DB;
+    vector4DC = toCameraMatrix * vector4DC;
 }
 
 std::vector<triangle> nearPlaneClipping(triangle &triangleBuffer)
