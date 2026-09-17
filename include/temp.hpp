@@ -1,6 +1,18 @@
 #ifndef TEMP_HPP
 #define TEMP_HPP
 
+struct Vector4D{
+    float x;
+    float y;
+    float z;
+    float w;
+};
+
+struct Matrix4x4{
+    float matrix[4][4];
+};
+
+// ##########################
 
 inline Mesh2d makeTorus(
     int majorSegments = 64,
