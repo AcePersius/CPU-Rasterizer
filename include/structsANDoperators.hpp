@@ -26,6 +26,15 @@ Ft   = 2,
 FpsandFt = 3
 };
 
+enum struct ClipPlanes{
+left = 0,
+right = 1,
+bottom = 2,
+top = 3,
+near = 4,
+far = 5,
+};
+
 struct colorBuffer{
     std::vector<std::uint32_t> pixels;
     colorBuffer()
@@ -70,6 +79,7 @@ struct RGBA{
 struct Vertex{
     Vector position;
     RGBA colorData;
+    float inverseW;
 };
 
 struct triangle{
@@ -87,6 +97,15 @@ struct Transformation{
     Vector position;
     Vector rotation;
     Vector scale;
+};
+
+struct Camera{
+    Vector position;
+    Vector rotation;
+    float FOV;
+    float AspectRatio;
+    float nearPlane;
+    float farPlane;
 };
 
 struct Mesh2d{
@@ -112,6 +131,17 @@ struct Vector4D{
     float y;
     float z;
     float w;
+};
+
+struct Vertex4D{
+    Vector4D position;
+    RGBA colorData;
+};
+
+struct triangle4D{
+    Vertex4D Vertex4DA;
+    Vertex4D Vertex4DB;
+    Vertex4D Vertex4DC;    
 };
 
 struct Matrix4x4{
@@ -176,6 +206,30 @@ Vector toVector(Vector4D fourD)
     return buffer;
 };
 
+Vertex toVertex3D(Vertex4D const &Vertex4D)
+{
+    Vertex A {};
+    A.position.x = Vertex4D.position.x;
+    A.position.y = Vertex4D.position.y;
+    A.position.z = Vertex4D.position.z;
+    A.colorData  = Vertex4D.colorData;
+    return A;
+};
+
+// I dont think this has a use anymore but I'll keep it anyways
+// For now
+triangle toTriangle3D(triangle4D const &triangle4D)
+{
+    Vertex A = toVertex3D(triangle4D.Vertex4DA);
+    Vertex B = toVertex3D(triangle4D.Vertex4DB);
+    Vertex C = toVertex3D(triangle4D.Vertex4DC);
+    triangle triangle3D {};
+    triangle3D.VertexA = A;
+    triangle3D.VertexB = B;
+    triangle3D.VertexC = C;
+    return triangle3D;
+};
+
 // Standard Matrix Multiplication is Matrix A's rows * Matrix B's Columns
 // Something I learned! Matrix Math is non-communicative, but it is associative!
 // What does that mean? There are particular rules such as:
@@ -237,6 +291,29 @@ Matrix4x4 toRotateZMatrix(Matrix4x4 BaseMatrix, const float angle)
     BaseMatrix.matrix[1][0] =  std::sin(((angle * PIE) / 180));
     BaseMatrix.matrix[1][1] =  std::cos(((angle * PIE) / 180));
     return BaseMatrix;
+}
+
+Matrix4x4 toClipSpaceMatrix(Camera const &cameraTransf)
+{
+    /*| Xscale   0       0       0 |
+      |   0    Yscale    0       0 |
+      |   0      0       A       B |
+      |   0      0       1       0 |*/
+    // X row → controls horizontal FOV
+    // Y row → controls vertical FOV
+    // Z row → maps near/far depth into [0,1]
+    // W row → stores camera-space z so perspective divide can happen
+    Matrix4x4 ClipSpaceMatrix {0};
+    float Yscale = 1.0f / std::tan((cameraTransf.FOV * PIE / 180.0f) / 2.0f);
+    float Xscale = Yscale / cameraTransf.AspectRatio;
+    float A = cameraTransf.farPlane / (cameraTransf.farPlane - cameraTransf.nearPlane);
+    float B = -(cameraTransf.farPlane * cameraTransf.nearPlane) / (cameraTransf.farPlane - cameraTransf.nearPlane);
+    ClipSpaceMatrix.matrix[0][0] = Xscale;
+    ClipSpaceMatrix.matrix[1][1] = Yscale;
+    ClipSpaceMatrix.matrix[2][2] = A;
+    ClipSpaceMatrix.matrix[2][3] = B;
+    ClipSpaceMatrix.matrix[3][2] = 1;
+    return ClipSpaceMatrix;
 }
 
 RGBA operator+(const RGBA &lhs, const RGBA &rhs)

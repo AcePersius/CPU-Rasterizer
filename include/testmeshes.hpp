@@ -2,7 +2,7 @@
 #define TESTMESHES_HPP
 
 Transformation transform{
-{0, 0, 30},
+{0, 0, 10},
 {0, 0, 0},
 {.25, .25, .25}
 };
@@ -15,10 +15,13 @@ Transformation transform{
 };
 */
 
-Transformation cameraTransf{
+Camera cameraTransf{
     {0, 0, 0},
     {0, 0, 0},
-    {0, 0, 0}
+    {70},
+    {static_cast<float>(frameWidth) / static_cast<float>(frameHeight)},
+    {1.0f},
+    {1000.0f}
 };
 
 

@@ -27,15 +27,21 @@ constexpr float EPSILON = .0000001;
 Mesh2d TorusMesh = makeTorus();
 
 // Takes in mesh data and sends it to rasterizer
-void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Transformation const &cameraTransf);
+void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf);
 Matrix4x4 createWorldSpaceMatrix(Transformation const &transform);
-Matrix4x4 createCameraSpaceMatrix(Transformation const &cameraTransf);
+Matrix4x4 createCameraSpaceMatrix(Camera const &cameraTransf);
 void toWorldSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toWorldMatrix);
 void toCameraSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toCameraMatrix);
-std::vector<triangle> nearPlaneClipping(triangle &triangleBuffer);
-void processEdge(Vertex &Vertex1, Vertex &Vertex2, std::vector<Vertex> &clippedTriangle);
-void perspectiveProjection(Vertex &Vertex);
-void toScreenSpace(Vertex &Vertex);
+
+float planeValue(Vector4D const &position, ClipPlanes plane);
+void toClipSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &ClipSpaceMatrix);
+void processEdgeClip(Vertex4D const &Vertex1, Vertex4D const &Vertex2, std::vector<Vertex4D> &clippedVertices, ClipPlanes plane);
+std::vector<Vertex4D> clipPolygonAgainstPlane(std::vector<Vertex4D> const &polygon, ClipPlanes plane);
+std::vector<Vertex4D> clipPolygonAgainstFrustum(std::vector<Vertex4D> polygon);
+Vertex toNDC(Vertex4D const &Vertex4d);
+std::vector<triangle> triangulatePolygon(std::vector<Vertex> const &polygon);
+void toScreenSpace(triangle &triangle);
+
 BoundingBoxData boundingBox(auto &meshdata);
 bool TopLeftFillFunc(Vector &start, Vector &end);
 float getDeterminant(Vector &VertexA, Vector &VertexB, Vector &pointC);
@@ -47,7 +53,6 @@ void drawToBuffer(Vertex &pixel, framebuffer &frameBufferData, auto &meshdata);
 void RASTERIZE(auto &meshdata, framebuffer &frameBufferData);
 void FramePackager(Vertex &pixel, framebuffer &buffer, auto &meshdata);
 std::uint32_t pixelPackager(RGBA &pixel);
-void fillpixelcolor(RGBA &pixel, auto &meshdata);
 void performanceAndMonitoring(framebuffer &buffer);
 
 
@@ -148,56 +153,55 @@ int main(int argc, char* argv[]) {
 }
 
 
-void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Transformation const &cameraTransf)
+void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf)
 {
-    // Buffer for drawing triangles
     if (mesh.Indices.size() % 3 != 0)
     {
         return;
     }
 
-    Matrix4x4 toWorldSpaceMatrix = createWorldSpaceMatrix(transform);
+    Matrix4x4 toWorldSpaceMatrix  = createWorldSpaceMatrix(transform);
     Matrix4x4 toCameraSpaceMatrix = createCameraSpaceMatrix(cameraTransf);
-        for(std::size_t i = 0; i < (mesh.Indices.size()); i+=3)
+    Matrix4x4 ClipSpaceMatrix   = toClipSpaceMatrix(cameraTransf);
+
+        for(int i = 0; i < (mesh.Indices.size()); i+=3)
     {
-        triangle triangleBuffer {0};
-        triangleBuffer.VertexA = mesh.Vertices[mesh.Indices[i]];
-        triangleBuffer.VertexB = mesh.Vertices[mesh.Indices[i+1]];
-        triangleBuffer.VertexC = mesh.Vertices[mesh.Indices[i+2]];
+        triangle4D triangleBuffer {0};
+        triangleBuffer.Vertex4DA.position = toVector4D(mesh.Vertices[mesh.Indices[i]].position);
+        triangleBuffer.Vertex4DA.colorData = mesh.Vertices[mesh.Indices[i]].colorData;
 
-        Vector4D buffer4DA {0};
-        Vector4D buffer4DB {0};
-        Vector4D buffer4DC {0};
-        buffer4DA = toVector4D(triangleBuffer.VertexA.position);
-        buffer4DB = toVector4D(triangleBuffer.VertexB.position);
-        buffer4DC = toVector4D(triangleBuffer.VertexC.position);
+        triangleBuffer.Vertex4DB.position = toVector4D(mesh.Vertices[mesh.Indices[i+1]].position);
+        triangleBuffer.Vertex4DB.colorData = mesh.Vertices[mesh.Indices[i+1]].colorData;
 
-        toWorldSpace(buffer4DA, buffer4DB, buffer4DC, toWorldSpaceMatrix);
+        triangleBuffer.Vertex4DC.position = toVector4D(mesh.Vertices[mesh.Indices[i+2]].position);
+        triangleBuffer.Vertex4DC.colorData = mesh.Vertices[mesh.Indices[i+2]].colorData;
+        
+        toWorldSpace(triangleBuffer.Vertex4DA.position, triangleBuffer.Vertex4DB.position, triangleBuffer.Vertex4DC.position, toWorldSpaceMatrix);
 
-        toCameraSpace(buffer4DA, buffer4DB, buffer4DC, toCameraSpaceMatrix);
+        toCameraSpace(triangleBuffer.Vertex4DA.position, triangleBuffer.Vertex4DB.position, triangleBuffer.Vertex4DC.position, toCameraSpaceMatrix);
 
+        toClipSpace(triangleBuffer.Vertex4DA.position, triangleBuffer.Vertex4DB.position, triangleBuffer.Vertex4DC.position, ClipSpaceMatrix);
 
-        triangleBuffer.VertexA.position = toVector(buffer4DA);
-        triangleBuffer.VertexB.position = toVector(buffer4DB);
-        triangleBuffer.VertexC.position = toVector(buffer4DC);
+        std::vector<Vertex4D> polygon {};
+        polygon.emplace_back(triangleBuffer.Vertex4DA);
+        polygon.emplace_back(triangleBuffer.Vertex4DB);
+        polygon.emplace_back(triangleBuffer.Vertex4DC);
 
-        std::vector<triangle> clippedTriangles = nearPlaneClipping(triangleBuffer);
-        if (clippedTriangles.size() == 0)
+        // Under Construction
+        std::vector<Vertex4D> clippedPolygon = clipPolygonAgainstFrustum(polygon);
+
+        std::vector<Vertex> NDCclippedPolygon;
+        for (int i = 0; i < clippedPolygon.size(); i++)
         {
-            continue;
+            NDCclippedPolygon.emplace_back(toNDC(clippedPolygon[i]));
         }
 
-        for (int j = 0; j < clippedTriangles.size(); j++)
+        std::vector<triangle> triangles = triangulatePolygon(NDCclippedPolygon);
+        for (int i = 0; i < triangles.size(); i++)
         {
-        perspectiveProjection(clippedTriangles[j].VertexA);
-        perspectiveProjection(clippedTriangles[j].VertexB);
-        perspectiveProjection(clippedTriangles[j].VertexC);
-
-        toScreenSpace(clippedTriangles[j].VertexA);        
-        toScreenSpace(clippedTriangles[j].VertexB);
-        toScreenSpace(clippedTriangles[j].VertexC);
-
-        RASTERIZE(clippedTriangles[j], frameBufferData);
+        triangle triangle3D = triangles[i];
+        toScreenSpace(triangle3D);
+        RASTERIZE(triangle3D, frameBufferData);
         }
     }
 }
@@ -220,8 +224,14 @@ Matrix4x4 createWorldSpaceMatrix(Transformation const &transform)
     return toWorldMatrix;
 }
 
-// New implementation of Converting from Object Space to World space using transform Matrices
-Matrix4x4 createCameraSpaceMatrix(Transformation const &cameraTransf)
+void toWorldSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toWorldMatrix)
+{
+    vector4DA = toWorldMatrix * vector4DA;
+    vector4DB = toWorldMatrix * vector4DB;
+    vector4DC = toWorldMatrix * vector4DC;
+}
+
+Matrix4x4 createCameraSpaceMatrix(Camera const &cameraTransf)
 {
     // Declarations For Transformation Matrices
     Matrix4x4 RotationX;
@@ -238,13 +248,6 @@ Matrix4x4 createCameraSpaceMatrix(Transformation const &cameraTransf)
     return toCamMatrix;
 }
 
-void toWorldSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toWorldMatrix)
-{
-    vector4DA = toWorldMatrix * vector4DA;
-    vector4DB = toWorldMatrix * vector4DB;
-    vector4DC = toWorldMatrix * vector4DC;
-}
-
 void toCameraSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toCameraMatrix)
 {
     vector4DA = toCameraMatrix * vector4DA;
@@ -252,109 +255,177 @@ void toCameraSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC
     vector4DC = toCameraMatrix * vector4DC;
 }
 
-std::vector<triangle> nearPlaneClipping(triangle &triangleBuffer)
+void toClipSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &ClipSpaceMatrix)
 {
-    std::vector<Vertex> clippedVertices;
-
-    processEdge(triangleBuffer.VertexA, triangleBuffer.VertexB, clippedVertices);
-    processEdge(triangleBuffer.VertexB, triangleBuffer.VertexC, clippedVertices);
-    processEdge(triangleBuffer.VertexC, triangleBuffer.VertexA, clippedVertices);
-
-    if (clippedVertices.size() == 3)
-    {
-        triangleBuffer.VertexA = clippedVertices[0];
-        triangleBuffer.VertexB = clippedVertices[1];
-        triangleBuffer.VertexC = clippedVertices[2];
-        std::vector<triangle> clippedTriangle;
-        clippedTriangle.emplace_back(triangleBuffer);
-        return clippedTriangle;
-    }
-    
-    if (clippedVertices.size() == 4)
-    {
-        triangleBuffer.VertexA = clippedVertices[0];
-        triangleBuffer.VertexB = clippedVertices[1];
-        triangleBuffer.VertexC = clippedVertices[2];
-        triangle clippedTriangle2;
-        clippedTriangle2.VertexA = clippedVertices[2];
-        clippedTriangle2.VertexB = clippedVertices[3];
-        clippedTriangle2.VertexC = clippedVertices[0];
-        std::vector<triangle> clippedTriangles;        
-        clippedTriangles.emplace_back(triangleBuffer);
-        clippedTriangles.emplace_back(clippedTriangle2);
-        return clippedTriangles;
-    }
-
-    // if clippedVertices.size() == 0;
-    std::vector<triangle> clippedTriangle;
-    return clippedTriangle;
-
+    vector4DA = ClipSpaceMatrix * vector4DA;
+    vector4DB = ClipSpaceMatrix * vector4DB;
+    vector4DC = ClipSpaceMatrix * vector4DC;
 }
 
-void processEdge(Vertex &Vertex1, Vertex &Vertex2, std::vector<Vertex> &clippedTriangle)
+
+// UNDER CONSTRUCTION!!!
+float planeValue(Vector4D const &position, ClipPlanes plane)
 {
-    float nearPlane = 1.0f;
-    bool p1 = (Vertex1.position.z >= nearPlane);
-    bool p2 = (Vertex2.position.z >= nearPlane);
-    /*V1→V2 : IN→IN  V1→V2 : IN→OUT  V1→V2 : OUT→IN       OUT->OUT
-          add V2       add newp1p2   add newp1p2, then V2   add nothing*/
+    switch (plane)
+    {
+    case (ClipPlanes::left):
+    // Logic: x >= -w
+    // x + w >= 0
+    return position.x + position.w;
+    case (ClipPlanes::right):
+    // Logic: x <= w
+    // w - x >= 0
+    return position.w - position.x;
+    case (ClipPlanes::bottom):
+    // Logic: y >= -w
+    // y + w >= 0
+    return position.y + position.w;
+    case (ClipPlanes::top):
+    // Logic: y <= w
+    // w - y >= 0
+    return position.w - position.y;
+    case (ClipPlanes::near):
+    // Logic: z >= 0
+    return position.z;
+    case (ClipPlanes::far):
+    // Logic: z <= w
+    // w - z >= 0
+    return position.w - position.z;
+    }
+    return 0.0f;
+}
+
+void processEdgeClip(Vertex4D const &Vertex1, Vertex4D const &Vertex2, std::vector<Vertex4D> &clippedVertices, ClipPlanes plane)
+{
+    // Calculates a point's value relative to the selected plane left/right/bottom/top/etc...
+    // Value >= 0 means inside/on the plane, Value < 0 means outside the plane
+    float d1 = planeValue(Vertex1.position, plane);
+    float d2 = planeValue(Vertex2.position, plane);
+    // Because planeValue restructs the equations to be based on (W +/- Var >= 0),
+    // we only need to compare d1/d2 to 0.0f
+    // if d1 or d2 is less than 0 it is out of the chosen plane
+    bool p1 = d1 >= 0.0f;
+    bool p2 = d2 >= 0.0f;
+
+    // Given whether (a) point(s) is inside or outside chooses which
+    // logic is chosen in adding zero, one, or 2 vertices to the polygon
+
+    // V1→V2 : IN→IN add V2
     if (p1 == true && p2 == true)
     {
-        clippedTriangle.emplace_back(Vertex2);
+        clippedVertices.emplace_back(Vertex2);
         return;
     }
+    // V1→V2 : OUT→IN add newVertex, then V2
     if (p1 == false && p2 == true)
     {
-        // t = (nearPlane - Az) / (Bz - Az)    
-        float tp1p2 = (nearPlane - Vertex1.position.z) / (Vertex2.position.z - Vertex1.position.z);
-        /* newAB.x = A.x + tAB * (B.x - A.x)
-        newAB.y = A.y + tAB * (B.y - A.y)
-        newAB.z = A.z + tAB * (B.z - A.z) */
-        Vertex newp1p2;
-        newp1p2.position.x = Vertex1.position.x + tp1p2 * (Vertex2.position.x - Vertex1.position.x);
-        newp1p2.position.y = Vertex1.position.y + tp1p2 * (Vertex2.position.y - Vertex1.position.y);
-        newp1p2.position.z = nearPlane;
-        newp1p2.colorData = Vertex1.colorData + tp1p2 * (Vertex2.colorData - Vertex1.colorData);
-        clippedTriangle.emplace_back(newp1p2);
-        clippedTriangle.emplace_back(Vertex2);
+        float t = d1 / (d1 - d2);
+        // newAB.x = A.x + t * (B.x - A.x)
+        // newAB.y = A.y + t * (B.y - A.y)
+        // newAB.z = A.z + t * (B.z - A.z)
+        // newAB.w = A.w + t * (B.w - A.w)
+        Vertex4D newVertex{};
+        newVertex.position.x = Vertex1.position.x + t * (Vertex2.position.x - Vertex1.position.x);
+        newVertex.position.y = Vertex1.position.y + t * (Vertex2.position.y - Vertex1.position.y);
+        newVertex.position.z = Vertex1.position.z + t * (Vertex2.position.z - Vertex1.position.z);
+        newVertex.position.w = Vertex1.position.w + t * (Vertex2.position.w - Vertex1.position.w);
+        newVertex.colorData  = Vertex1.colorData  + t * (Vertex2.colorData  - Vertex1.colorData);
+        clippedVertices.emplace_back(newVertex);
+        clippedVertices.emplace_back(Vertex2);
         return;
     }
+    // V1→V2 : IN→OUT add newVertex
     if (p1 == true && p2 == false)
     {
-        float tp1p2 = (nearPlane - Vertex1.position.z) / (Vertex2.position.z - Vertex1.position.z);
-        Vertex newp1p2;
-        newp1p2.position.x = Vertex1.position.x + tp1p2 * (Vertex2.position.x - Vertex1.position.x);
-        newp1p2.position.y = Vertex1.position.y + tp1p2 * (Vertex2.position.y - Vertex1.position.y);
-        newp1p2.position.z = nearPlane;
-        newp1p2.colorData = Vertex1.colorData + tp1p2 * (Vertex2.colorData - Vertex1.colorData);
-        clippedTriangle.emplace_back(newp1p2);
+        float t = d1 / (d1 - d2);
+        Vertex4D newVertex{};
+        newVertex.position.x = Vertex1.position.x + t * (Vertex2.position.x - Vertex1.position.x);
+        newVertex.position.y = Vertex1.position.y + t * (Vertex2.position.y - Vertex1.position.y);
+        newVertex.position.z = Vertex1.position.z + t * (Vertex2.position.z - Vertex1.position.z);
+        newVertex.position.w = Vertex1.position.w + t * (Vertex2.position.w - Vertex1.position.w);
+        newVertex.colorData  = Vertex1.colorData  + t * (Vertex2.colorData  - Vertex1.colorData);
+        clippedVertices.emplace_back(newVertex);
         return;
     }
+    // OUT->OUT add nothing
     if (p1 == false && p2 == false)
     {
         return;
     }
 }
 
-void perspectiveProjection(Vertex &Vertex)
+std::vector<Vertex4D> clipPolygonAgainstPlane(std::vector<Vertex4D> const &polygon, ClipPlanes plane)
 {
-    // arbitrary temp value
-    float FOCALPOINT = 300;
-    // Adds Depth so objects get smaller depending on the Z value
-    // Focalpoint currently acts as a zoom value 
-    Vertex.position.x = (Vertex.position.x / Vertex.position.z) * FOCALPOINT;
-    Vertex.position.y = (Vertex.position.y / Vertex.position.z) * FOCALPOINT;
+    std::vector<Vertex4D> clippedVertices;
+    if (polygon.empty())
+    {
+        return clippedVertices;
+    }
+    for (int i = 0; i < polygon.size(); i++)
+    {
+        int next = (i + 1) % polygon.size();
+        processEdgeClip(polygon[i], polygon[next], clippedVertices, plane);
+    }
+    return clippedVertices;
 }
 
-void toScreenSpace(Vertex &Vertex)
+std::vector<Vertex4D> clipPolygonAgainstFrustum(std::vector<Vertex4D> polygon)
 {
-    // Converting to Screen Coordinates aka centers object
-    Vertex.position.x = Vertex.position.x + (frameWidth / 2);
-    // This Y flip is very important to note, it flips Winding logic
-    // A lot of rework had to be done to reflect this single flip
-    Vertex.position.y = -Vertex.position.y + (frameHeight / 2);
+    polygon = clipPolygonAgainstPlane(polygon, ClipPlanes::left);
+        if (polygon.empty()){return polygon;}
+    polygon = clipPolygonAgainstPlane(polygon, ClipPlanes::right);
+        if (polygon.empty()){return polygon;}
+    polygon = clipPolygonAgainstPlane(polygon, ClipPlanes::bottom);
+        if (polygon.empty()){return polygon;}
+    polygon = clipPolygonAgainstPlane(polygon, ClipPlanes::top);
+        if (polygon.empty()){return polygon;}
+    polygon = clipPolygonAgainstPlane(polygon, ClipPlanes::near);
+        if (polygon.empty()){return polygon;}
+    polygon = clipPolygonAgainstPlane(polygon, ClipPlanes::far);
+        return polygon;
 }
 
+Vertex toNDC(Vertex4D const &Vertex4d)
+{
+    Vertex Vertex3d {};
+    Vertex3d.inverseW = 1.0f / Vertex4d.position.w;
+    Vertex3d.position.x = Vertex4d.position.x * Vertex3d.inverseW;
+    Vertex3d.position.y = Vertex4d.position.y * Vertex3d.inverseW;
+    Vertex3d.position.z = Vertex4d.position.z * Vertex3d.inverseW;
+    Vertex3d.colorData = Vertex4d.colorData;
+    return Vertex3d;
+}
+
+void toScreenSpace(triangle &triangle)
+{
+    // Screenspace Grid works with (0,0) as the top left of the screen
+    // NDC uses y+ as upward, whereas in ScreenSpace y+ is downward
+    // therefore y is special in the fact it needs its sign (+) flipped (-)
+    // in order to reverse the behavior of y
+    triangle.VertexA.position.x =  (triangle.VertexA.position.x + 1) * 0.5f * frameWidth;
+    triangle.VertexB.position.x =  (triangle.VertexB.position.x + 1) * 0.5f * frameWidth;
+    triangle.VertexC.position.x =  (triangle.VertexC.position.x + 1) * 0.5f * frameWidth;
+    // Add note about y in screen space is turned negative
+    triangle.VertexA.position.y =  (1 - triangle.VertexA.position.y) * 0.5f * frameHeight;
+    triangle.VertexB.position.y =  (1 - triangle.VertexB.position.y) * 0.5f * frameHeight;
+    triangle.VertexC.position.y =  (1 - triangle.VertexC.position.y) * 0.5f * frameHeight;
+    // Z is fine because NDC 0-1 stills works for depth
+}
+
+std::vector<triangle> triangulatePolygon(std::vector<Vertex> const &polygon)
+{
+    std::vector<triangle> triangles {};
+        if (polygon.size() < 3){return triangles;}
+    for (int i = 1; i + 1 < polygon.size(); i++)
+    {
+        triangle buffer {0};
+        buffer.VertexA = polygon[0];
+        buffer.VertexB = polygon[i];
+        buffer.VertexC = polygon[i+1];
+        triangles.emplace_back(buffer);
+    }
+    return triangles;
+}
 
 void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
 {
@@ -544,57 +615,40 @@ std::uint32_t pixelPackager(RGBA &pixel)
     return packed_pixel;
 }
 
-// TEMP
-void fillpixelcolor( RGBA &pixel, auto &meshdata)
-{
-    pixel.red   = ((meshdata.VertexA.colorData.red   + meshdata.VertexB.colorData.red   + meshdata.VertexC.colorData.red  ) / 3);
-    pixel.green = ((meshdata.VertexA.colorData.green + meshdata.VertexB.colorData.green + meshdata.VertexC.colorData.green) / 3);
-    pixel.blue  = ((meshdata.VertexA.colorData.blue  + meshdata.VertexB.colorData.blue  + meshdata.VertexC.colorData.blue ) / 3);
-    pixel.alpha = ((meshdata.VertexA.colorData.alpha + meshdata.VertexB.colorData.alpha + meshdata.VertexC.colorData.alpha) / 3);
-}
-// Step 7
-
+// Consider moving repeated calculations from child functions to parent functions
 void barycentrics(Determinant &determinants, auto &meshdata, Vertex &pixel)
 {
     barycentricColor(determinants, meshdata, pixel);
     barycentricZ(determinants, meshdata, pixel);
 }
 
-// barycentric coordinates
 void barycentricColor(Determinant &determinants, auto &meshdata, Vertex &pixel)
 {
     float totalDeterminant = determinants.AB + determinants.BC + determinants.CA;
-    float percentageA = std::abs((determinants.BC) / totalDeterminant);
-    float percentageB = std::abs((determinants.CA) / totalDeterminant);
-    float percentageC = std::abs((determinants.AB) / totalDeterminant);
-    RGBA colorOverZA = meshdata.VertexA.colorData / meshdata.VertexA.position.z;
-    RGBA colorOverZB = meshdata.VertexB.colorData / meshdata.VertexB.position.z;
-    RGBA colorOverZC = meshdata.VertexC.colorData / meshdata.VertexC.position.z;
+    float percentA = std::abs((determinants.BC) / totalDeterminant);
+    float percentB = std::abs((determinants.CA) / totalDeterminant);
+    float percentC = std::abs((determinants.AB) / totalDeterminant);
 
-    RGBA interpolatedColorOverZ = colorOverZA * percentageA + colorOverZB * percentageB + colorOverZC * percentageC;
+    float interpolatedInverseW = meshdata.VertexA.inverseW * percentA + 
+    meshdata.VertexB.inverseW * percentB + meshdata.VertexC.inverseW * percentC;
 
-    float inverseZ = (1.0 / meshdata.VertexA.position.z) * percentageA +
-        (1.0 / meshdata.VertexB.position.z) * percentageB +
-        (1.0 / meshdata.VertexC.position.z) * percentageC;
+    RGBA numerator = (meshdata.VertexA.colorData * meshdata.VertexA.inverseW) * percentA + 
+    (meshdata.VertexB.colorData * meshdata.VertexB.inverseW) * percentB + (meshdata.VertexC.colorData * meshdata.VertexC.inverseW) * percentC;
 
-    pixel.colorData = interpolatedColorOverZ / inverseZ;
+    pixel.colorData = numerator / interpolatedInverseW;
 }
 
 void barycentricZ(Determinant &determinants, auto &meshdata, Vertex &pixel)
 {
     float totalDeterminant = determinants.AB + determinants.BC + determinants.CA;
-    float percentageA = std::abs((determinants.BC) / totalDeterminant);
-    float percentageB = std::abs((determinants.CA) / totalDeterminant);
-    float percentageC = std::abs((determinants.AB) / totalDeterminant);
-    float ZA = 1.0f / meshdata.VertexA.position.z;
-    float ZB = 1.0f / meshdata.VertexB.position.z;
-    float ZC = 1.0f / meshdata.VertexC.position.z;
-
-    float inverseZ = ZA * percentageA + ZB * percentageB + ZC * percentageC;
-
-    pixel.position.z = 1.0f / inverseZ;
+    float percentA = std::abs((determinants.BC) / totalDeterminant);
+    float percentB = std::abs((determinants.CA) / totalDeterminant);
+    float percentC = std::abs((determinants.AB) / totalDeterminant);
+    pixel.position.z = meshdata.VertexA.position.z * percentA + 
+    meshdata.VertexB.position.z * percentB + meshdata.VertexC.position.z * percentC;
 }
 
+// Consider moving repeated calculations
 bool depthTest(framebuffer &buffer, Vector &pixel)
 {
     if (buffer.pixelDepth.depthVals[static_cast<int>(pixel.x) + (static_cast<int>(pixel.y) * frameWidth)] > pixel.z)
