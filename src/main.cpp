@@ -15,22 +15,24 @@
 
 // my supporting files
 #include <structsANDoperators.hpp>
+#include <objLoader.hpp>
 #include <textsystem.hpp>
 #include <perfANDmonitoring.hpp>
+#include <mouseANDkeyboard.hpp>
 #include <testmeshes.hpp>
 #include <temp.hpp>
 // end
 
+
 constexpr float EPSILON = .0000001;
 
-//TEMP TEST
-Mesh2d TorusMesh = makeTorus();
-
 // Takes in mesh data and sends it to rasterizer
-void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf);
+void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf, Texture const &texture);
 Matrix4x4 createWorldSpaceMatrix(Transformation const &transform);
+Matrix4x4 createNormalMatrix( Transformation const &transform);
 Matrix4x4 createCameraSpaceMatrix(Camera const &cameraTransf);
 void toWorldSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toWorldMatrix);
+void toWorldSpaceNormal(Vector &vectorA, Vector &vectorB, Vector &vectorC, Matrix4x4 const &NormalMatrix);
 void toCameraSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toCameraMatrix);
 
 float planeValue(Vector4D const &position, ClipPlanes plane);
@@ -47,16 +49,24 @@ bool TopLeftFillFunc(Vector &start, Vector &end);
 float getDeterminant(Vector &VertexA, Vector &VertexB, Vector &pointC);
 void barycentrics(Determinant &determinants, auto &meshdata, Vertex &pixel);
 void barycentricColor(Determinant &determinants, auto &meshdata, Vertex &pixel);
+void barycentricNormal(Determinant &determinants, auto &meshdata, Vertex &pixel);
+void barycentricUV(Determinant &determinants, auto &meshdata, Vertex &pixel);
 void barycentricZ(Determinant &determinants, auto &meshdata, Vertex &pixel);
 bool depthTest(framebuffer &buffer, Vector &pixel);
 void drawToBuffer(Vertex &pixel, framebuffer &frameBufferData, auto &meshdata);
-void RASTERIZE(auto &meshdata, framebuffer &frameBufferData);
+void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, Texture const &texture);
+void calculatelighting(Vertex &pixel, Vector const &directionToLight);
 void FramePackager(Vertex &pixel, framebuffer &buffer, auto &meshdata);
 std::uint32_t pixelPackager(RGBA &pixel);
-void performanceAndMonitoring(framebuffer &buffer);
+void performanceAndMonitoring(SETTINGS &settings);
+void drawPerformanceAndMonitoring(SETTINGS &settings, framebuffer &buffer);
+
+RGBA sampleTexture(Texture const &texture, VectorUV const &UV);
 
 
 int main(int argc, char* argv[]) {
+    // Initializes Settings
+    initResolution(settings.frameWidth, settings.frameHeight, settings.Resolution, cameraTransf);
 
     SDL_Window *window;                                 // Declare a pointer
     bool done = false;
@@ -68,14 +78,12 @@ int main(int argc, char* argv[]) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not init sdl: %s\n", SDL_GetError());
         return 1;
     }
-    int width =  800;
-    int height = 600;
     // Create an application window with the following settings:
     window = SDL_CreateWindow(
         "Rasterizer",                  // window title
-        width,                               // width, in pixels
-        height,                               // height, in pixels
-        0                                  // flags - see below
+        settings.frameWidth,           // width, in pixels
+    settings.frameHeight,              // height, in pixels
+        0                              // flags - see below
     );
     // Check that the window was successfully created
     if (window == NULL) {
@@ -83,16 +91,42 @@ int main(int argc, char* argv[]) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not create window: %s\n", SDL_GetError());
         return 1;
     }
+    // Mouse Input Mode
+    if (!SDL_SetWindowRelativeMouseMode(window, true))
+    {
+        std::cout << "Failed to enable Relative Mouse mode: " <<
+        SDL_GetError << "\n";
 
-    framebuffer frameBufferData;
+    }
+
     // Currently acts as a preset buffer to write pixels to before displaying
     // SDL wants is a pointer to the first actual pixel element stored inside the vector. For std::vector, the standard way to get that contiguous memory pointer is .data()
-    SDL_Surface * surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, frameBufferData.colorPixels.pixels.data(), frameWidth *4);
+    SDL_Surface * surface = SDL_CreateSurfaceFrom(settings.frameWidth, settings.frameHeight, SDL_PIXELFORMAT_RGBA8888, frameBufferData.colorPixels.pixels.data(), settings.frameWidth *4);
     if (surface == nullptr)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not create surface: %s\n", SDL_GetError());
         return 1;
     }
+
+    //TEMP TEST
+    Mesh2d TorusMesh = makeTorus();
+    Mesh2d Goober = createGooberMesh();
+
+    /*
+    Texture GooberTexture = createCheckerboard(
+        64,
+        64,
+        8,
+        {255.0f, 255.0f, 255.0f, 255.0f},
+        {30.0f, 30.0f, 30.0f, 255.0f}
+    ); */
+
+    Texture GooberTexture = loadTexture("include/assets/Marty.png");
+    std::cout
+        << "Texture loaded: "
+        << GooberTexture.width << "x"
+        << GooberTexture.height << '\n';
+    Mesh2d texturedGoober = createTexturedGoober();
 
     // TEMP
     bool moveaway = true;
@@ -105,15 +139,40 @@ int main(int argc, char* argv[]) {
             if (event.type == SDL_EVENT_QUIT) {
                 done = true;
             }
+            if (event.type == SDL_EVENT_MOUSE_MOTION)
+            {
+                float mouseSensitivity = 0.1f;
+
+                cameraTransf.rotation.y += event.motion.xrel * mouseSensitivity;
+                cameraTransf.rotation.x += event.motion.yrel * mouseSensitivity;
+                if (cameraTransf.rotation.x > 89.0f){cameraTransf.rotation.x = 89.0f;}
+                if (cameraTransf.rotation.x < -89.0f){cameraTransf.rotation.x = -89.0f;}
+            }
+            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat)
+            {
+                if (event.key.scancode == SDL_SCANCODE_F)
+                {
+                    if (settings.MovementMode == FPSstyle)
+                    {
+                        settings.MovementMode = NOCLIP;
+                    }
+                    else
+                    {
+                        settings.MovementMode = FPSstyle;
+                    }
+                }
+            }
         }
-        performanceAndMonitoring(frameBufferData);
+        performanceAndMonitoring(settings);
+        updateCamera(cameraTransf, deltaTime, settings);
 
         std::fill(frameBufferData.colorPixels.pixels.begin(), frameBufferData.colorPixels.pixels.end(), 0x000000FF);
         std::fill(frameBufferData.pixelDepth.depthVals.begin(), frameBufferData.pixelDepth.depthVals.end(), INFINITY_Render_Distance);
-        // RendersMesh TorusMesh, SquareMesh, triangleMesh
-        RenderMesh(TorusMesh, frameBufferData, transform, cameraTransf);
-        drawPerformanceAndMonitoring(frameBufferData);
-        // Cube animation
+        // RendersMesh TorusMesh, Goober, texturedGoober, SquareMesh, triangleMesh
+        RenderMesh(texturedGoober, frameBufferData, transform, cameraTransf, GooberTexture);
+        drawPerformanceAndMonitoring(settings, frameBufferData);
+        // Cube animations
+        /*
         float movementSpeed = 30.0f;
         float rotationSpeed = 15.0f;
         
@@ -136,7 +195,7 @@ int main(int argc, char* argv[]) {
         transform.rotation.x += rotationSpeed * deltaTime;
         transform.rotation.y += rotationSpeed * deltaTime;
         transform.rotation.z += rotationSpeed * deltaTime;
-        
+        */
 
         // step 11
         SDL_BlitSurface(surface, NULL, SDL_GetWindowSurface(window), NULL);
@@ -153,7 +212,7 @@ int main(int argc, char* argv[]) {
 }
 
 
-void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf)
+void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf, Texture const &texture)
 {
     if (mesh.Indices.size() % 3 != 0)
     {
@@ -161,6 +220,7 @@ void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation
     }
 
     Matrix4x4 toWorldSpaceMatrix  = createWorldSpaceMatrix(transform);
+    Matrix4x4 NormalMatrix  = createNormalMatrix(transform);
     Matrix4x4 toCameraSpaceMatrix = createCameraSpaceMatrix(cameraTransf);
     Matrix4x4 ClipSpaceMatrix   = toClipSpaceMatrix(cameraTransf);
 
@@ -176,7 +236,18 @@ void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation
         triangleBuffer.Vertex4DC.position = toVector4D(mesh.Vertices[mesh.Indices[i+2]].position);
         triangleBuffer.Vertex4DC.colorData = mesh.Vertices[mesh.Indices[i+2]].colorData;
         
+        Vector faceNormal = calculateFaceNormal(mesh.Vertices[mesh.Indices[i]].position, 
+            mesh.Vertices[mesh.Indices[i+1]].position, mesh.Vertices[mesh.Indices[i+2]].position);
+        triangleBuffer.Vertex4DA.normal = faceNormal;
+        triangleBuffer.Vertex4DB.normal = faceNormal;
+        triangleBuffer.Vertex4DC.normal = faceNormal;
+
+        triangleBuffer.Vertex4DA.UV = mesh.Vertices[mesh.Indices[i]].UV;
+        triangleBuffer.Vertex4DB.UV = mesh.Vertices[mesh.Indices[i+1]].UV;
+        triangleBuffer.Vertex4DC.UV = mesh.Vertices[mesh.Indices[i+2]].UV;
+
         toWorldSpace(triangleBuffer.Vertex4DA.position, triangleBuffer.Vertex4DB.position, triangleBuffer.Vertex4DC.position, toWorldSpaceMatrix);
+        toWorldSpaceNormal(triangleBuffer.Vertex4DA.normal, triangleBuffer.Vertex4DB.normal, triangleBuffer.Vertex4DC.normal, NormalMatrix);
 
         toCameraSpace(triangleBuffer.Vertex4DA.position, triangleBuffer.Vertex4DB.position, triangleBuffer.Vertex4DC.position, toCameraSpaceMatrix);
 
@@ -201,7 +272,7 @@ void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation
         {
         triangle triangle3D = triangles[i];
         toScreenSpace(triangle3D);
-        RASTERIZE(triangle3D, frameBufferData);
+        RASTERIZE(triangle3D, frameBufferData, texture);
         }
     }
 }
@@ -224,11 +295,38 @@ Matrix4x4 createWorldSpaceMatrix(Transformation const &transform)
     return toWorldMatrix;
 }
 
+Matrix4x4 createNormalMatrix( Transformation const &transform)
+{
+    Matrix4x4 InverseScale;
+    Matrix4x4 RotationX;
+    Matrix4x4 RotationY;
+    Matrix4x4 RotationZ;
+    InverseScale = toInverseScaleMatrix(BaseMatrix, transform.scale.x, transform.scale.y, transform.scale.z);
+    RotationX = toRotateXMatrix(BaseMatrix, transform.rotation.x);
+    RotationY = toRotateYMatrix(BaseMatrix, transform.rotation.y);
+    RotationZ = toRotateZMatrix(BaseMatrix, transform.rotation.z);
+    Matrix4x4 NormalMatrix = RotationZ *(RotationY *(RotationX * InverseScale));
+    return NormalMatrix;
+}
+
 void toWorldSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, Matrix4x4 const &toWorldMatrix)
 {
     vector4DA = toWorldMatrix * vector4DA;
     vector4DB = toWorldMatrix * vector4DB;
     vector4DC = toWorldMatrix * vector4DC;
+}
+
+void toWorldSpaceNormal(Vector &vectorA, Vector &vectorB, Vector &vectorC, Matrix4x4 const &NormalMatrix)
+{
+    Vector4D vector4DA = NormaltoVector4D(vectorA);
+    Vector4D vector4DB = NormaltoVector4D(vectorB);
+    Vector4D vector4DC = NormaltoVector4D(vectorC);
+    vector4DA = NormalMatrix * vector4DA;
+    vector4DB = NormalMatrix * vector4DB;
+    vector4DC = NormalMatrix * vector4DC;
+    vectorA = normalize(toVector(vector4DA));
+    vectorB = normalize(toVector(vector4DB));
+    vectorC = normalize(toVector(vector4DC));
 }
 
 Matrix4x4 createCameraSpaceMatrix(Camera const &cameraTransf)
@@ -262,8 +360,6 @@ void toClipSpace(Vector4D &vector4DA, Vector4D &vector4DB, Vector4D &vector4DC, 
     vector4DC = ClipSpaceMatrix * vector4DC;
 }
 
-
-// UNDER CONSTRUCTION!!!
 float planeValue(Vector4D const &position, ClipPlanes plane)
 {
     switch (plane)
@@ -325,11 +421,13 @@ void processEdgeClip(Vertex4D const &Vertex1, Vertex4D const &Vertex2, std::vect
         // newAB.z = A.z + t * (B.z - A.z)
         // newAB.w = A.w + t * (B.w - A.w)
         Vertex4D newVertex{};
-        newVertex.position.x = Vertex1.position.x + t * (Vertex2.position.x - Vertex1.position.x);
-        newVertex.position.y = Vertex1.position.y + t * (Vertex2.position.y - Vertex1.position.y);
-        newVertex.position.z = Vertex1.position.z + t * (Vertex2.position.z - Vertex1.position.z);
-        newVertex.position.w = Vertex1.position.w + t * (Vertex2.position.w - Vertex1.position.w);
-        newVertex.colorData  = Vertex1.colorData  + t * (Vertex2.colorData  - Vertex1.colorData);
+        newVertex.position.x = Vertex1.position.x + (t * (Vertex2.position.x - Vertex1.position.x));
+        newVertex.position.y = Vertex1.position.y + (t * (Vertex2.position.y - Vertex1.position.y));
+        newVertex.position.z = Vertex1.position.z + (t * (Vertex2.position.z - Vertex1.position.z));
+        newVertex.position.w = Vertex1.position.w + (t * (Vertex2.position.w - Vertex1.position.w));
+        newVertex.colorData  = Vertex1.colorData  + (t * (Vertex2.colorData  - Vertex1.colorData));
+        newVertex.normal = Vertex1.normal + (t * (Vertex2.normal - Vertex1.normal));
+        newVertex.UV = Vertex1.UV + (t * (Vertex2.UV - Vertex1.UV));
         clippedVertices.emplace_back(newVertex);
         clippedVertices.emplace_back(Vertex2);
         return;
@@ -344,6 +442,8 @@ void processEdgeClip(Vertex4D const &Vertex1, Vertex4D const &Vertex2, std::vect
         newVertex.position.z = Vertex1.position.z + t * (Vertex2.position.z - Vertex1.position.z);
         newVertex.position.w = Vertex1.position.w + t * (Vertex2.position.w - Vertex1.position.w);
         newVertex.colorData  = Vertex1.colorData  + t * (Vertex2.colorData  - Vertex1.colorData);
+        newVertex.normal = Vertex1.normal + (t * (Vertex2.normal - Vertex1.normal));
+        newVertex.UV = Vertex1.UV + (t * (Vertex2.UV - Vertex1.UV));
         clippedVertices.emplace_back(newVertex);
         return;
     }
@@ -393,6 +493,8 @@ Vertex toNDC(Vertex4D const &Vertex4d)
     Vertex3d.position.y = Vertex4d.position.y * Vertex3d.inverseW;
     Vertex3d.position.z = Vertex4d.position.z * Vertex3d.inverseW;
     Vertex3d.colorData = Vertex4d.colorData;
+    Vertex3d.normal = Vertex4d.normal;
+    Vertex3d.UV = Vertex4d.UV;
     return Vertex3d;
 }
 
@@ -402,13 +504,13 @@ void toScreenSpace(triangle &triangle)
     // NDC uses y+ as upward, whereas in ScreenSpace y+ is downward
     // therefore y is special in the fact it needs its sign (+) flipped (-)
     // in order to reverse the behavior of y
-    triangle.VertexA.position.x =  (triangle.VertexA.position.x + 1) * 0.5f * frameWidth;
-    triangle.VertexB.position.x =  (triangle.VertexB.position.x + 1) * 0.5f * frameWidth;
-    triangle.VertexC.position.x =  (triangle.VertexC.position.x + 1) * 0.5f * frameWidth;
+    triangle.VertexA.position.x =  (triangle.VertexA.position.x + 1) * 0.5f * settings.frameWidth;
+    triangle.VertexB.position.x =  (triangle.VertexB.position.x + 1) * 0.5f * settings.frameWidth;
+    triangle.VertexC.position.x =  (triangle.VertexC.position.x + 1) * 0.5f * settings.frameWidth;
     // Add note about y in screen space is turned negative
-    triangle.VertexA.position.y =  (1 - triangle.VertexA.position.y) * 0.5f * frameHeight;
-    triangle.VertexB.position.y =  (1 - triangle.VertexB.position.y) * 0.5f * frameHeight;
-    triangle.VertexC.position.y =  (1 - triangle.VertexC.position.y) * 0.5f * frameHeight;
+    triangle.VertexA.position.y =  (1 - triangle.VertexA.position.y) * 0.5f * settings.frameHeight;
+    triangle.VertexB.position.y =  (1 - triangle.VertexB.position.y) * 0.5f * settings.frameHeight;
+    triangle.VertexC.position.y =  (1 - triangle.VertexC.position.y) * 0.5f * settings.frameHeight;
     // Z is fine because NDC 0-1 stills works for depth
 }
 
@@ -427,7 +529,7 @@ std::vector<triangle> triangulatePolygon(std::vector<Vertex> const &polygon)
     return triangles;
 }
 
-void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
+void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, Texture const &texture)
 {
     // For this data xyMinMax comes in the format of:
     // [0] = xmin [1] = ymin [2] = xmax [3] = ymax
@@ -476,7 +578,10 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
              So HERE CCW, a point inside of the triangle has all POSITIVE determinant values.
              HERE CW, a point inside of the triangle has all NEGATIVE determinant values.
             */
-            switch (frameBufferData.WindingMode) // Step 6
+
+            // Temp Lighting Source value
+            Vector directionToLight = normalize({-1.0f, 1.0f, -1.0f});
+            switch (settings.WindingMode) // Step 6
             {
             case CW: // Points are NEGATIVE inside of the triangle
                 // How the 0 : Epsilon Offset works In order to avoid potential conflict of two triangles claiming the SAME
@@ -489,6 +594,9 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
                 && (determinants.CA <= (CAisTopOrLeft ? 0 : -EPSILON)))
                 {
                     barycentrics(determinants, meshdata, pixel);
+                    RGBA textureColor = sampleTexture(texture, pixel.UV);
+                    pixel.colorData = modulateColor(pixel.colorData, textureColor);
+                    calculatelighting(pixel, directionToLight);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
@@ -499,6 +607,7 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
                 && (determinants.BC  <= (BCisTopOrLeft ? 0 : -EPSILON)) && (determinants.CA <= (CAisTopOrLeft ? 0 : -EPSILON))))
                 {
                     barycentrics(determinants, meshdata, pixel);
+                    calculatelighting(pixel, directionToLight);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
@@ -508,6 +617,7 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData)
                 && (determinants.CA >= (CAisTopOrLeft ? 0 : EPSILON)))
                 {
                     barycentrics(determinants, meshdata, pixel);
+                    calculatelighting(pixel, directionToLight);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
                 break;
@@ -527,10 +637,10 @@ BoundingBoxData boundingBox(auto &meshdata)
     xyMinMax.ymin = (xyMinMax.ymin < 0) ? 0: xyMinMax.ymin;
 
     xyMinMax.xmax = std::max(meshdata.VertexA.position.x, std::max(meshdata.VertexB.position.x, meshdata.VertexC.position.x));
-    xyMinMax.xmax = (xyMinMax.xmax >= frameWidth) ? frameWidth - 1: xyMinMax.xmax;
+    xyMinMax.xmax = (xyMinMax.xmax >= settings.frameWidth) ? settings.frameWidth - 1: xyMinMax.xmax;
 
     xyMinMax.ymax = std::max(meshdata.VertexA.position.y, std::max(meshdata.VertexB.position.y, meshdata.VertexC.position.y));
-    xyMinMax.ymax = (xyMinMax.ymax >= frameHeight) ? frameHeight - 1: xyMinMax.ymax;
+    xyMinMax.ymax = (xyMinMax.ymax >= settings.frameHeight) ? settings.frameHeight - 1: xyMinMax.ymax;
     return xyMinMax;
 }
 // Finding determinant-Offeset for the topleft fill rule
@@ -569,7 +679,7 @@ float getDeterminant(Vector &VertexA, Vector &VertexB, Vector &pointC)
 void drawToBuffer(Vertex &pixel, framebuffer &frameBufferData, auto &meshdata)
 {
         // checking for out of bounds indice
-        if (pixel.position.x >= frameWidth || pixel.position.y >= frameHeight || pixel.position.x < 0 || pixel.position.y < 0)
+        if (pixel.position.x >= settings.frameWidth || pixel.position.y >= settings.frameHeight || pixel.position.x < 0 || pixel.position.y < 0)
         {
             return;
         }
@@ -588,7 +698,7 @@ void FramePackager(Vertex &pixel, framebuffer &buffer, auto &meshdata)
     // Pixel packer needs to come back
     packed_pixel = pixelPackager(pixel.colorData);
     // converts x, y screen coords to pixel indice and used to be a helper function
-    std::uint32_t indice = pixel.position.x + (pixel.position.y * frameWidth);
+    std::uint32_t indice = pixel.position.x + (pixel.position.y * settings.frameWidth);
     buffer.colorPixels.pixels[indice] = packed_pixel;
 }
 
@@ -620,6 +730,8 @@ void barycentrics(Determinant &determinants, auto &meshdata, Vertex &pixel)
 {
     barycentricColor(determinants, meshdata, pixel);
     barycentricZ(determinants, meshdata, pixel);
+    barycentricNormal(determinants, meshdata, pixel);
+    barycentricUV(determinants, meshdata, pixel);
 }
 
 void barycentricColor(Determinant &determinants, auto &meshdata, Vertex &pixel)
@@ -648,13 +760,76 @@ void barycentricZ(Determinant &determinants, auto &meshdata, Vertex &pixel)
     meshdata.VertexB.position.z * percentB + meshdata.VertexC.position.z * percentC;
 }
 
+void barycentricNormal(Determinant &determinants, auto &meshdata, Vertex &pixel)
+{
+    float totalDeterminant = determinants.AB + determinants.BC + determinants.CA;
+    float percentA = std::abs((determinants.BC) / totalDeterminant);
+    float percentB = std::abs((determinants.CA) / totalDeterminant);
+    float percentC = std::abs((determinants.AB) / totalDeterminant);
+
+    float interpolatedInverseW = meshdata.VertexA.inverseW * percentA + 
+    meshdata.VertexB.inverseW * percentB + meshdata.VertexC.inverseW * percentC;
+
+    Vector numerator = (meshdata.VertexA.normal * meshdata.VertexA.inverseW) * percentA + 
+    (meshdata.VertexB.normal * meshdata.VertexB.inverseW) * percentB + (meshdata.VertexC.normal * meshdata.VertexC.inverseW) * percentC;
+
+    pixel.normal = normalize(numerator / interpolatedInverseW);
+}
+
+void barycentricUV(Determinant &determinants, auto &meshdata, Vertex &pixel)
+{
+    float totalDeterminant = determinants.AB + determinants.BC + determinants.CA;
+    float percentA = std::abs((determinants.BC) / totalDeterminant);
+    float percentB = std::abs((determinants.CA) / totalDeterminant);
+    float percentC = std::abs((determinants.AB) / totalDeterminant);
+
+    float interpolatedInverseW = meshdata.VertexA.inverseW * percentA + 
+    meshdata.VertexB.inverseW * percentB + meshdata.VertexC.inverseW * percentC;
+
+    VectorUV numerator = (meshdata.VertexA.UV * meshdata.VertexA.inverseW) * percentA + 
+    (meshdata.VertexB.UV * meshdata.VertexB.inverseW) * percentB + (meshdata.VertexC.UV * meshdata.VertexC.inverseW) * percentC;
+
+    pixel.UV = numerator / interpolatedInverseW;
+}
+
+void calculatelighting(Vertex &pixel, Vector const &directionToLight)
+{
+    // This can/will be changed in the future to allow more dynamic lighting changes
+    float diffuse = dotProduct(pixel.normal, directionToLight);
+    if (diffuse < 0.0f){diffuse = 0.0f;}
+    float ambient = .15f;
+    float brightness = diffuse + ambient;
+    if (brightness > 1.0f){brightness = 1.0f;}
+    pixel.colorData = brightnessRGBACalc(brightness, pixel.colorData);
+}
+
+RGBA sampleTexture(Texture const &texture, VectorUV const &UV)
+{
+    if (!std::isfinite(UV.u) || !std::isfinite(UV.v) || UV.u < 0.0f ||
+    UV.u > 1.0f || UV.v < 0.0f || UV.v > 1.0f)
+    {
+    std::cout
+        << "BAD UV: "
+        << UV.u << ", "
+        << UV.v
+        << '\n';
+    return {255.0f, 0.0f, 255.0f, 255.0f};
+    }
+
+    int x = static_cast<int>(UV.u * (texture.width-1));
+    int y = static_cast<int>(UV.v * (texture.height-1));
+    int index = x + y * texture.width;
+    return texture.pixels[index];
+}
+
 // Consider moving repeated calculations
 bool depthTest(framebuffer &buffer, Vector &pixel)
 {
-    if (buffer.pixelDepth.depthVals[static_cast<int>(pixel.x) + (static_cast<int>(pixel.y) * frameWidth)] > pixel.z)
+    if (buffer.pixelDepth.depthVals[static_cast<int>(pixel.x) + (static_cast<int>(pixel.y) * settings.frameWidth)] > pixel.z)
     {
-        buffer.pixelDepth.depthVals[static_cast<int>(pixel.x) + (static_cast<int>(pixel.y) * frameWidth)] = pixel.z;
+        buffer.pixelDepth.depthVals[static_cast<int>(pixel.x) + (static_cast<int>(pixel.y) * settings.frameWidth)] = pixel.z;
         return true;
     }
     return false;
 }
+

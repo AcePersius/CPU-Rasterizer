@@ -2,10 +2,47 @@
 #define TESTMESHES_HPP
 
 Transformation transform{
-{0, 0, 10},
+{0, 0, 2},
 {0, 0, 0},
 {.25, .25, .25}
 };
+
+
+Texture createCheckerboard(
+    int width,
+    int height,
+    int tileSize,
+    RGBA colorA,
+    RGBA colorB)
+{
+    Texture texture{};
+
+    texture.width = width;
+    texture.height = height;
+    texture.pixels.resize(width * height);
+
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            int tileX = x / tileSize;
+            int tileY = y / tileSize;
+
+            int index = x + y * width;
+
+            if ((tileX + tileY) % 2 == 0)
+            {
+                texture.pixels[index] = colorA;
+            }
+            else
+            {
+                texture.pixels[index] = colorB;
+            }
+        }
+    }
+
+    return texture;
+}
 
 /*
 Transformation transform{
@@ -16,11 +53,17 @@ Transformation transform{
 */
 
 Camera cameraTransf{
+    // Position
     {0, 0, 0},
+    // Rotation
     {0, 0, 0},
+    // FOV
     {70},
-    {static_cast<float>(frameWidth) / static_cast<float>(frameHeight)},
+    // Aspect Ratio
+    {16.0f / 9.0f},
+    // Nearplane
     {1.0f},
+    // Farplane
     {1000.0f}
 };
 
