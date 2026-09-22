@@ -27,6 +27,7 @@
 constexpr float EPSILON = .0000001;
 
 // Takes in mesh data and sends it to rasterizer
+void RenderModel(LoadedModel const &model, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf);
 void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf, Texture const &texture);
 Matrix4x4 createWorldSpaceMatrix(Transformation const &transform);
 Matrix4x4 createNormalMatrix( Transformation const &transform);
@@ -65,6 +66,16 @@ RGBA sampleTexture(Texture const &texture, VectorUV const &UV);
 
 
 int main(int argc, char* argv[]) {
+
+    int version = SDL_GetVersion();
+
+std::cout
+    << "SDL version: "
+    << SDL_VERSIONNUM_MAJOR(version) << "."
+    << SDL_VERSIONNUM_MINOR(version) << "."
+    << SDL_VERSIONNUM_MICRO(version)
+    << '\n';
+
     // Initializes Settings
     initResolution(settings.frameWidth, settings.frameHeight, settings.Resolution, cameraTransf);
 
@@ -109,8 +120,8 @@ int main(int argc, char* argv[]) {
     }
 
     //TEMP TEST
-    Mesh2d TorusMesh = makeTorus();
-    Mesh2d Goober = createGooberMesh();
+    // Mesh2d TorusMesh = makeTorus();
+    // Mesh2d Goober = createGooberMesh();
 
     /*
     Texture GooberTexture = createCheckerboard(
@@ -120,16 +131,12 @@ int main(int argc, char* argv[]) {
         {255.0f, 255.0f, 255.0f, 255.0f},
         {30.0f, 30.0f, 30.0f, 255.0f}
     ); */
+    OBJData OBJdata = loadOBJdata("include/assets/Lowpoly_tree_sample.obj");
+    MTLData MTLdata = loadMTLdata("include/assets/Lowpoly_tree_sample.mtl");
+    LoadedModel loadedModel = buildLoadedModel(OBJdata, MTLdata);
+    //Mesh2d Meshy = OBJtoMesh(OBJdata, GenericColor);
+    //Texture MeshyTexture = loadTexture("include/assets/Marty.png");
 
-    Texture GooberTexture = loadTexture("include/assets/Marty.png");
-    std::cout
-        << "Texture loaded: "
-        << GooberTexture.width << "x"
-        << GooberTexture.height << '\n';
-    Mesh2d texturedGoober = createTexturedGoober();
-
-    // TEMP
-    bool moveaway = true;
     Transformation OriginalTransform = transform;
 
     while (!done) {
@@ -168,35 +175,12 @@ int main(int argc, char* argv[]) {
 
         std::fill(frameBufferData.colorPixels.pixels.begin(), frameBufferData.colorPixels.pixels.end(), 0x000000FF);
         std::fill(frameBufferData.pixelDepth.depthVals.begin(), frameBufferData.pixelDepth.depthVals.end(), INFINITY_Render_Distance);
-        // RendersMesh TorusMesh, Goober, texturedGoober, SquareMesh, triangleMesh
-        RenderMesh(texturedGoober, frameBufferData, transform, cameraTransf, GooberTexture);
-        drawPerformanceAndMonitoring(settings, frameBufferData);
-        // Cube animations
-        /*
-        float movementSpeed = 30.0f;
-        float rotationSpeed = 15.0f;
-        
-        if (transform.position.z >= OriginalTransform.position.z +30)
-        {
-            moveaway = false;
-        }
-        else if (transform.position.z <= OriginalTransform.position.z -10)
-        {
-            moveaway = true;
-        }
-        if (moveaway == true)
-        {
-            transform.position.z += movementSpeed * deltaTime;
-        }
-        if (moveaway == false)
-        {
-            transform.position.z -= movementSpeed * deltaTime;
-        }
-        transform.rotation.x += rotationSpeed * deltaTime;
-        transform.rotation.y += rotationSpeed * deltaTime;
-        transform.rotation.z += rotationSpeed * deltaTime;
-        */
 
+        RenderModel(loadedModel, frameBufferData, transform, cameraTransf);
+
+        // RendersMesh TorusMesh, Goober, texturedGoober, SquareMesh, triangleMesh, Meshy
+        // RenderMesh(Meshy, frameBufferData, transform, cameraTransf, MeshyTexture);
+        drawPerformanceAndMonitoring(settings, frameBufferData);
         // step 11
         SDL_BlitSurface(surface, NULL, SDL_GetWindowSurface(window), NULL);
         SDL_UpdateWindowSurface(window);
@@ -211,6 +195,20 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+void RenderModel(LoadedModel const &model, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf)
+{
+    for (SubMesh const &submesh : model.subMeshes)
+    {
+        if (submesh.mesh.Indices.empty())
+        {
+            continue;
+        }
+        int materialIndex = submesh.materialIndex;
+        Material const &material = model.materials[materialIndex];
+
+        RenderMesh(submesh.mesh, frameBufferData, transform, cameraTransf, material.diffuseTexture);
+    }
+}
 
 void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation const &transform, Camera const &cameraTransf, Texture const &texture)
 {
@@ -236,11 +234,30 @@ void RenderMesh(Mesh2d const &mesh, framebuffer &frameBufferData, Transformation
         triangleBuffer.Vertex4DC.position = toVector4D(mesh.Vertices[mesh.Indices[i+2]].position);
         triangleBuffer.Vertex4DC.colorData = mesh.Vertices[mesh.Indices[i+2]].colorData;
         
-        Vector faceNormal = calculateFaceNormal(mesh.Vertices[mesh.Indices[i]].position, 
+
+        triangleBuffer.Vertex4DA.normal = mesh.Vertices[mesh.Indices[i]].normal;
+        triangleBuffer.Vertex4DB.normal = mesh.Vertices[mesh.Indices[i + 1]].normal;
+        triangleBuffer.Vertex4DC.normal = mesh.Vertices[mesh.Indices[i + 2]].normal;
+
+        if (vectorLength(mesh.Vertices[mesh.Indices[i]].normal) < EPSILON)
+        {
+            Vector faceNormal = calculateFaceNormal(mesh.Vertices[mesh.Indices[i]].position, 
             mesh.Vertices[mesh.Indices[i+1]].position, mesh.Vertices[mesh.Indices[i+2]].position);
-        triangleBuffer.Vertex4DA.normal = faceNormal;
-        triangleBuffer.Vertex4DB.normal = faceNormal;
-        triangleBuffer.Vertex4DC.normal = faceNormal;
+            triangleBuffer.Vertex4DA.normal = faceNormal;
+        }
+        if (vectorLength(mesh.Vertices[mesh.Indices[i + 1]].normal) < EPSILON)
+        {
+            Vector faceNormal = calculateFaceNormal(mesh.Vertices[mesh.Indices[i]].position, 
+            mesh.Vertices[mesh.Indices[i+1]].position, mesh.Vertices[mesh.Indices[i+2]].position);
+            triangleBuffer.Vertex4DB.normal = faceNormal;
+        }
+        if (vectorLength(mesh.Vertices[mesh.Indices[i + 2]].normal) < EPSILON)
+        {
+            Vector faceNormal = calculateFaceNormal(mesh.Vertices[mesh.Indices[i]].position, 
+            mesh.Vertices[mesh.Indices[i+1]].position, mesh.Vertices[mesh.Indices[i+2]].position);
+            triangleBuffer.Vertex4DC.normal = faceNormal;
+        }
+        
 
         triangleBuffer.Vertex4DA.UV = mesh.Vertices[mesh.Indices[i]].UV;
         triangleBuffer.Vertex4DB.UV = mesh.Vertices[mesh.Indices[i+1]].UV;
@@ -607,6 +624,8 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, Texture const &text
                 && (determinants.BC  <= (BCisTopOrLeft ? 0 : -EPSILON)) && (determinants.CA <= (CAisTopOrLeft ? 0 : -EPSILON))))
                 {
                     barycentrics(determinants, meshdata, pixel);
+                    RGBA textureColor = sampleTexture(texture, pixel.UV);
+                    pixel.colorData = modulateColor(pixel.colorData, textureColor);
                     calculatelighting(pixel, directionToLight);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
@@ -617,6 +636,8 @@ void RASTERIZE(auto &meshdata, framebuffer &frameBufferData, Texture const &text
                 && (determinants.CA >= (CAisTopOrLeft ? 0 : EPSILON)))
                 {
                     barycentrics(determinants, meshdata, pixel);
+                    RGBA textureColor = sampleTexture(texture, pixel.UV);
+                    pixel.colorData = modulateColor(pixel.colorData, textureColor);
                     calculatelighting(pixel, directionToLight);
                     drawToBuffer(pixel, frameBufferData, meshdata);
                 }
@@ -797,7 +818,7 @@ void calculatelighting(Vertex &pixel, Vector const &directionToLight)
     // This can/will be changed in the future to allow more dynamic lighting changes
     float diffuse = dotProduct(pixel.normal, directionToLight);
     if (diffuse < 0.0f){diffuse = 0.0f;}
-    float ambient = .15f;
+    float ambient = .35f;
     float brightness = diffuse + ambient;
     if (brightness > 1.0f){brightness = 1.0f;}
     pixel.colorData = brightnessRGBACalc(brightness, pixel.colorData);

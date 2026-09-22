@@ -7,7 +7,6 @@ Transformation transform{
 {.25, .25, .25}
 };
 
-
 Texture createCheckerboard(
     int width,
     int height,

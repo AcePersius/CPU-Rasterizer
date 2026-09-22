@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cmath>
+#include <string>
 
 constexpr float INFINITY_Render_Distance = 9999999.0f;
 constexpr float PIE = 3.141592;
@@ -76,6 +77,48 @@ struct Vertex{
     VectorUV UV {0, 0};
 };
 
+
+// Obj Loader Structs
+
+struct OBJVertexIndex
+{
+    int positionIndex = -1;
+    int UVIndex = -1;
+    int normalIndex = -1;
+};
+
+struct OBJFace
+{
+    std::vector<OBJVertexIndex> vertices;
+
+    std::string materialName;
+};
+
+struct OBJData
+{
+    std::vector<Vector> positions;
+    std::vector<VectorUV> UVs;
+    std::vector<Vector> normals;
+    std::vector<OBJFace> faces;
+
+    std::string materialLibrary;
+};
+
+// Mtl Loader Structs
+
+struct MTLMaterialData
+{
+    // Name of Material
+    std::string name;
+    RGBA diffuseColor {255, 255, 255, 255};
+    // File Path to the Texture
+    std::string diffuseTexturePath;
+};
+
+struct MTLData{
+    std::vector<MTLMaterialData> materials;
+};
+
 struct triangle{
     Vertex VertexA;
     Vertex VertexB;
@@ -84,8 +127,8 @@ struct triangle{
 
 struct Texture
 {
-    int width;
-    int height;
+    int width{0};
+    int height{0};
     std::vector<RGBA> pixels;
 };
 
@@ -108,7 +151,7 @@ void initResolution(int &frameWidth, int &frameHeight, Resolutions &Resolution, 
 
 struct SETTINGS{
     const windingModes WindingMode = CW;
-    const pANDmOptions PerfAndMonitoring = FpsandFt;
+    const pANDmOptions PerfAndMonitoring = None;
     MovementModes MovementMode = NOCLIP;
     Resolutions Resolution = Res1280x720;
     int frameWidth;
@@ -142,6 +185,42 @@ struct Mesh2d{
     std::vector<Vertex> Vertices;
     std::vector<int> Indices; 
 };
+
+// New Model Structs
+struct Material
+{
+    std::string name;
+    RGBA diffuseColor{255.0f, 255.0f, 255.0f, 255.0f};
+    Texture diffuseTexture;
+};
+
+struct SubMesh
+{
+    Mesh2d mesh;
+    int materialIndex{-1};
+};
+
+struct LoadedModel
+{
+    std::vector<SubMesh> subMeshes;
+    std::vector<Material> materials;
+};
+
+// Default Texture
+Texture createWhiteTexture()
+{
+    Texture texture{};
+
+    texture.width = 1;
+    texture.height = 1;
+
+    texture.pixels.emplace_back(
+        RGBA{255.0f, 255.0f, 255.0f, 255.0f}
+    );
+
+    return texture;
+}
+
 
 struct Determinant{
     float AB;
@@ -207,9 +286,18 @@ void initResolution(int &frameWidth, int &frameHeight, Resolutions &Resolution, 
     cameraTransf.AspectRatio = static_cast<float>(frameWidth)/ static_cast<float>(frameHeight);
 }
 
+
+//fix
 float tx;
 float ty;
 float tz;
+
+RGBA GenericColor{
+    188,
+    188,
+    188,
+    255
+};
 
 Matrix4x4 BaseMatrix{
     {{1, 0, 0, 0},
