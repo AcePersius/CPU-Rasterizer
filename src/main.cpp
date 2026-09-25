@@ -1,5 +1,9 @@
+// Used for Window Creation and Input reading
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+// Loader for GLTF and GLB files
+#include <gltfLoader.hpp>
+
 // used for std::uint8-32_t
 #include <cstdint>
 // used for std::cout testing
@@ -21,6 +25,7 @@
 #include <mouseANDkeyboard.hpp>
 #include <testmeshes.hpp>
 #include <temp.hpp>
+#include <logger.hpp>
 // end
 
 
@@ -65,19 +70,27 @@ void drawPerformanceAndMonitoring(SETTINGS &settings, framebuffer &buffer);
 RGBA sampleTexture(Texture const &texture, VectorUV const &UV);
 
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) 
+{
+
+    // Initializes Logger
+    initLogger("include/logs/latest.log");
 
     int version = SDL_GetVersion();
 
-std::cout
-    << "SDL version: "
-    << SDL_VERSIONNUM_MAJOR(version) << "."
-    << SDL_VERSIONNUM_MINOR(version) << "."
-    << SDL_VERSIONNUM_MICRO(version)
-    << '\n';
+    std::string SDL_Version = "SDL version: " + std::to_string(SDL_VERSIONNUM_MAJOR(version)) + "." + 
+    std::to_string(SDL_VERSIONNUM_MINOR(version)) + "." + std::to_string(SDL_VERSIONNUM_MICRO(version));
+    Logger(logLevel::Info, SDL_Version);
 
     // Initializes Settings
     initResolution(settings.frameWidth, settings.frameHeight, settings.Resolution, cameraTransf);
+
+    Logger(logLevel::Info, 
+    "Width: " + std::to_string(settings.frameWidth)
+    + " x " + "Height: " + std::to_string(settings.frameHeight)
+    + "\nColor Buffer size: " + std::to_string(frameBufferData.colorPixels.pixels.size())
+    + "\nDepth Buffer size: " + std::to_string(frameBufferData.pixelDepth.depthVals.size())
+    + '\n');
 
     SDL_Window *window;                                 // Declare a pointer
     bool done = false;
@@ -119,24 +132,8 @@ std::cout
         return 1;
     }
 
-    //TEMP TEST
-    // Mesh2d TorusMesh = makeTorus();
-    // Mesh2d Goober = createGooberMesh();
-
-    /*
-    Texture GooberTexture = createCheckerboard(
-        64,
-        64,
-        8,
-        {255.0f, 255.0f, 255.0f, 255.0f},
-        {30.0f, 30.0f, 30.0f, 255.0f}
-    ); */
-    OBJData OBJdata = loadOBJdata("include/assets/Lowpoly_tree_sample.obj");
-    MTLData MTLdata = loadMTLdata("include/assets/Lowpoly_tree_sample.mtl");
-    LoadedModel loadedModel = buildLoadedModel(OBJdata, MTLdata);
-    //Mesh2d Meshy = OBJtoMesh(OBJdata, GenericColor);
-    //Texture MeshyTexture = loadTexture("include/assets/Marty.png");
-
+    // LoadedModel loadedModel = LoadModel("include/assets/Lowpoly_tree_sample.obj");
+    LoadedModel loadedGLTFModel = GLTFLoader("include/assets/eezjyo2a.glb");
     Transformation OriginalTransform = transform;
 
     while (!done) {
@@ -176,12 +173,11 @@ std::cout
         std::fill(frameBufferData.colorPixels.pixels.begin(), frameBufferData.colorPixels.pixels.end(), 0x000000FF);
         std::fill(frameBufferData.pixelDepth.depthVals.begin(), frameBufferData.pixelDepth.depthVals.end(), INFINITY_Render_Distance);
 
-        RenderModel(loadedModel, frameBufferData, transform, cameraTransf);
+        RenderModel(loadedGLTFModel, frameBufferData, transform, cameraTransf);
+        // RenderMesh(MeshGLTF, frameBufferData, transform, cameraTransf, createWhiteTexture());
 
-        // RendersMesh TorusMesh, Goober, texturedGoober, SquareMesh, triangleMesh, Meshy
-        // RenderMesh(Meshy, frameBufferData, transform, cameraTransf, MeshyTexture);
         drawPerformanceAndMonitoring(settings, frameBufferData);
-        // step 11
+
         SDL_BlitSurface(surface, NULL, SDL_GetWindowSurface(window), NULL);
         SDL_UpdateWindowSurface(window);
         // Do game logic, present a frame, etc.
@@ -189,6 +185,9 @@ std::cout
 
     // Close and destroy the window
     SDL_DestroyWindow(window);
+
+    // ShutdownLogging
+    shutdownLogger();
 
     // Clean up
     SDL_Quit();

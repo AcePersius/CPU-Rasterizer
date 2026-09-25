@@ -1,0 +1,12 @@
+# ninja log v7
+114	1976	8120418112832830	CMakeFiles/TinyRasterizer.dir/src/logger.cpp.obj	eb58e1f91c65689
+103	2283	8120418112727650	CMakeFiles/TinyRasterizer.dir/src/structsANDoperators.cpp.obj	1529ef347c719c3
+91	5864	8120418112612354	CMakeFiles/TinyRasterizer.dir/src/main.cpp.obj	8419932e796bcc9c
+137	5914	8120418113068501	CMakeFiles/TinyRasterizer.dir/src/objLoader.cpp.obj	df32d25cd1345de
+58	7648	8120418112271536	_deps/fastgltf-build/CMakeFiles/fastgltf.dir/src/base64.cpp.obj	1700601af99aa021
+69	8925	8120418112381772	_deps/fastgltf-build/CMakeFiles/fastgltf.dir/src/io.cpp.obj	c496a2f5eef30364
+125	10142	8120418112938106	CMakeFiles/TinyRasterizer.dir/src/gltfLoader.cpp.obj	6dc077bc2da68afe
+80	14420	8120418112497139	_deps/fastgltf-build/CMakeFiles/fastgltf.dir/deps/simdjson/simdjson.cpp.obj	bbf5bb60f8154cb6
+7	17050	8120418111769358	_deps/fastgltf-build/CMakeFiles/fastgltf.dir/src/fastgltf.cpp.obj	46aeec55d4647cba
+17051	17343	8120418282204648	_deps/fastgltf-build/libfastgltf.a	2818714c2a0911ac
+17343	17786	8120418285122912	TinyRasterizer.exe	510afddfbb3c61f

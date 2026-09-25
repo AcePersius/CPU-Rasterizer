@@ -1,0 +1,21 @@
+# ninja log v7
+3	127	8120417942128097	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-mkdir	aaea8a78d59c04ce
+3	127	8120417942128097	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-mkdir	aaea8a78d59c04ce
+128	11342	8120418053578329	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-download	9b1c6e9ae03b91a9
+128	11342	8120418053578329	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-download	9b1c6e9ae03b91a9
+11345	12154	8120418054435413	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-update	d67d299e6427514c
+11345	12154	8120418054435413	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-update	d67d299e6427514c
+12155	12258	8120418063445361	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-patch	5261324f49fb36c
+12155	12258	8120418063445361	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-patch	5261324f49fb36c
+12258	12360	8120418064479057	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-configure	87e2351378466c6d
+12258	12360	8120418064479057	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-configure	87e2351378466c6d
+12360	12498	8120418065833806	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-build	6a1b34fbea09fd1
+12360	12498	8120418065833806	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-build	6a1b34fbea09fd1
+12500	12669	8120418067553633	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-install	e4aa1312482ff4fc
+12500	12669	8120418067553633	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-install	e4aa1312482ff4fc
+12671	12828	8120418069133514	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-test	a781778b45154d3
+12671	12828	8120418069133514	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-test	a781778b45154d3
+12828	13050	8120418071362636	CMakeFiles/fastgltf-populate-complete	249954a3b756253a
+12828	13050	8120418071362636	fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-done	249954a3b756253a
+12828	13050	8120418071362636	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/CMakeFiles/fastgltf-populate-complete	249954a3b756253a
+12828	13050	8120418071362636	C:/Users/percy/Pictures/rnd/CPU-Rasterizer/_deps/fastgltf-subbuild/fastgltf-populate-prefix/src/fastgltf-populate-stamp/fastgltf-populate-done	249954a3b756253a

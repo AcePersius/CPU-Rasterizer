@@ -4,7 +4,7 @@
 Transformation transform{
 {0, 0, 2},
 {0, 0, 0},
-{.25, .25, .25}
+{1, 1, 1}
 };
 
 Texture createCheckerboard(

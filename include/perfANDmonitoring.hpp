@@ -2,7 +2,7 @@
 #define PERFORMANCEANDMONITORING_HPP
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
+
 #include <array>
 #include <cstdint>
 
@@ -134,7 +134,6 @@ void drawPerformanceAndMonitoring(SETTINGS &settings, framebuffer &buffer)
         ElementCoords = ElementCoords + NextTextRow;
         goto END;
     }
-
 
     END:
 
