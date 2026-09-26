@@ -1,22 +1,11 @@
-#ifndef PERFORMANCEANDMONITORING_HPP
-#define PERFORMANCEANDMONITORING_HPP
+#include <softwareRender/perfANDmonitoring.hpp>
 
-#include <SDL3/SDL.h>
-
-#include <array>
-#include <cstdint>
-
-// my supporting files
-#include <structsANDoperators.hpp>
-
-// Used for FrameTime/ DeltaTime/ FPS
+double deltaTime;
 uint64_t previousTime = SDL_GetPerformanceCounter();
 double statsTimer = 0;
 int frameCount = 0;
 double AvgFPS = 0;
 double AvgFrameTimeMS = 0;
-double deltaTime;
-
 
 // deltaTime/ frameTime/ FPS
 void performanceAndMonitoring(SETTINGS &settings)
@@ -141,5 +130,3 @@ void drawPerformanceAndMonitoring(SETTINGS &settings, framebuffer &buffer)
     drawString(ElementCoords, buffer, bufferString);
     ElementCoords = ElementCoords + NextTextRow;
 }
-
-#endif

@@ -1,9 +1,4 @@
-#ifndef TEXT_SYSTEM_HPP
-#define TEXT_SYSTEM_HPP
-
-
-void drawCharacter(XYcoord xy, framebuffer &buffer, const std::array<uint8_t, 7> &letter);
-void drawString(XYcoord xy, framebuffer &buffer, std::string &string);
+#include <softwareRender/textsystem.hpp>
 
 std::uint32_t WHITE_PIXEL = 0xFFFFFFFF;
 std::uint32_t BLACK_PIXEL = 0x000000FF;
@@ -222,6 +217,3 @@ void drawCharacter(XYcoord xy, framebuffer &buffer, const std::array<uint8_t, 7>
         ++xy.y;
     }
 }
-
-
-#endif

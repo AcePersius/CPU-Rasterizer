@@ -3,7 +3,7 @@
 
 #include <SDL3/SDL.h>
 
-#include <structsANDoperators.hpp>
+#include <softwareRender/structsANDoperators.hpp>
 
 // This may or may not be staying
 // Mesh2d OBJtoMesh(OBJData const &OBJdata, RGBA const &genericColor);

@@ -1,4 +1,4 @@
-#include <gltfLoader.hpp>
+#include <loaders/gltfLoader.hpp>
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>
 #include <fastgltf/tools.hpp>
@@ -10,9 +10,9 @@
 #include <string>
 
 // My Files
-#include <logger.hpp>
-#include <structsANDoperators.hpp>
-#include <objLoader.hpp>
+#include <logs/logger.hpp>
+#include <softwareRender/structsANDoperators.hpp>
+#include <loaders/objLoader.hpp>
 
 /*
 FILE ON DISK

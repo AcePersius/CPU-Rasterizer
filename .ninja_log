@@ -10,3 +10,8 @@
 7	17050	8120418111769358	_deps/fastgltf-build/CMakeFiles/fastgltf.dir/src/fastgltf.cpp.obj	46aeec55d4647cba
 17051	17343	8120418282204648	_deps/fastgltf-build/libfastgltf.a	2818714c2a0911ac
 17343	17786	8120418285122912	TinyRasterizer.exe	510afddfbb3c61f
+50	1361	8120451375289426	CMakeFiles/TinyRasterizer.dir/src/structsANDoperators.cpp.obj	1529ef347c719c3
+24	2864	8120451375016654	CMakeFiles/TinyRasterizer.dir/src/main.cpp.obj	8419932e796bcc9c
+69	3383	8120451375479817	CMakeFiles/TinyRasterizer.dir/src/objLoader.cpp.obj	df32d25cd1345de
+59	5107	8120451375374619	CMakeFiles/TinyRasterizer.dir/src/gltfLoader.cpp.obj	6dc077bc2da68afe
+5107	5520	8120451425858142	TinyRasterizer.exe	510afddfbb3c61f

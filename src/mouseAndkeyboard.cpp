@@ -1,6 +1,4 @@
-#ifndef MOUSEANDKEYBOARD
-#define MOUSEANDKEYBOARD
-
+#include <softwareRender/mouseANDkeyboard.hpp>
 
 // pitch (x rotation)
 // yaw (y rotation)
@@ -32,30 +30,36 @@ void updateCamera(Camera &camera, float const &deltaTime, SETTINGS &settings)
         camera.position.x += forward.x * movement;
         camera.position.y += forward.y * movement;
         camera.position.z += forward.z * movement;
+        camera.viewUpdater = true;
     }
     if(key_states[SDL_SCANCODE_A])
     {
         camera.position.x -= right.x * movement;
         camera.position.z -= right.z * movement;
+        camera.viewUpdater = true;
     }
     if(key_states[SDL_SCANCODE_S])
     {
         camera.position.x -= forward.x * movement;
         camera.position.y -= forward.y * movement;
         camera.position.z -= forward.z * movement;
+        camera.viewUpdater = true;
     }
     if(key_states[SDL_SCANCODE_D])
     {
         camera.position.x += right.x * movement;
         camera.position.z += right.z * movement;
+        camera.viewUpdater = true;
     }
     if(key_states[SDL_SCANCODE_SPACE])
     {
         camera.position.y += movement;
+        camera.viewUpdater = true;
     }
     if(key_states[SDL_SCANCODE_LCTRL])
     {
         camera.position.y -= movement;
+        camera.viewUpdater = true;
     }    
 }
 /*
@@ -82,4 +86,3 @@ right.x =  cosθ
 right.y =  0
 right.z = -sinθ
 */
-#endif

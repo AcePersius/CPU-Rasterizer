@@ -1,5 +1,5 @@
-#include <objLoader.hpp>
-#include <logger.hpp>
+#include <loaders/objLoader.hpp>
+#include <logs/logger.hpp>
 
 #include <SDL3/SDL.h>
 

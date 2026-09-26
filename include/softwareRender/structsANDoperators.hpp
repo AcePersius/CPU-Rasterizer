@@ -59,6 +59,7 @@ struct Vector{
     float z = 0;
 };
 
+
 struct XYcoord{
     int x;
     int y;
@@ -139,17 +140,6 @@ struct Transformation{
     Vector rotation;
     Vector scale;
 };
-
-struct Camera{
-    Vector position;
-    Vector rotation;
-    float FOV;
-    float AspectRatio;
-    float nearPlane;
-    float farPlane;
-};
-
-void initResolution(int &frameWidth, int &frameHeight, Resolutions &Resolution, Camera &cameraTransf);
 
 struct SETTINGS{
     const windingModes WindingMode = CW;
@@ -242,13 +232,23 @@ struct Matrix4x4{
     float matrix[4][4];
 };
 
-//fix
-/*
-float tx;
-float ty;
-float tz;
-*/
-// cant remember if these are still used or not/ will remove later
+struct Camera{
+    Vector position;
+    Vector rotation;
+    float FOV;
+    float AspectRatio;
+    float nearPlane;
+    float farPlane;
+    // View Matrix
+    Matrix4x4 viewMatrix;
+    bool viewUpdater = true;
+    // Projection Matrix
+    Matrix4x4 projectionMatrix;
+    bool projectionUpdater = true;
+
+};
+
+void initResolution(int &frameWidth, int &frameHeight, Resolutions &Resolution, Camera &cameraTransf);
 
 extern RGBA GenericColor;
 
@@ -337,6 +337,9 @@ float vectorLength(Vector const &A);
 Vector normalize(Vector const &V);
 
 Vector calculateFaceNormal(Vector const &A, Vector const &B, Vector const &C);
+
+// Temp Lighting Source value
+inline Vector directionToLight = normalize({-1.0f, 1.0f, -1.0f});
 
 // Nums and Letters
 extern const std::array<uint8_t, 7> A;
